@@ -19,7 +19,7 @@ public sealed class FlowContext<TData> : FlowContext where TData : class, new()
 {
     public TData Data
     {
-        get => (TData)FlowData;
+        get => FlowData as TData ?? throw new InvalidOperationException("Unexpected FlowData Type.");
         set => FlowData = value;
     }
 }
