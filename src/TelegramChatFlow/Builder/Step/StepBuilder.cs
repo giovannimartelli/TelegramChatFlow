@@ -3,8 +3,8 @@ using TelegramChatFlow.Builder.Show;
 
 namespace TelegramChatFlow.Builder.Step;
 
-/// <summary>Builder fluent per la definizione di uno step.</summary>
-public sealed class StepBuilder
+/// <summary>Builder fluent per la definizione di uno step tipizzato.</summary>
+public sealed class StepBuilder<TData> where TData : class, new()
 {
     private readonly string _id;
     private ShowDefinition _show = new() { ContentType = ShowContentType.Text, Text = _ => Task.FromResult("") };
@@ -28,9 +28,9 @@ public sealed class StepBuilder
     // ── Display ────────────────────────────────────────
 
     /// <summary>Configura il contenuto visivo dello step.</summary>
-    public StepBuilder Show(Action<ShowBuilder> configure)
+    public StepBuilder<TData> Show(Action<ShowBuilder<TData>> configure)
     {
-        var builder = new ShowBuilder();
+        var builder = new ShowBuilder<TData>();
         configure(builder);
         _show = builder.Build();
         return this;
@@ -42,15 +42,15 @@ public sealed class StepBuilder
     /// Configura il tipo di input atteso dallo step.
     /// Se omesso, lo step è display-only.
     /// </summary>
-    public StepBuilder Input(Action<InputTypeConfigurator> configure)
+    public StepBuilder<TData> Input(Action<InputTypeConfigurator<TData>> configure)
     {
-        configure(new InputTypeConfigurator(this));
+        configure(new InputTypeConfigurator<TData>(this));
         return this;
     }
 
     // ── Flag ────────────────────────────────────────────
 
-    public StepBuilder Skippable()
+    public StepBuilder<TData> Skippable()
     {
         _skippable = true;
         return this;
@@ -60,28 +60,28 @@ public sealed class StepBuilder
     /// Il messaggio dello step resta visibile nella chat dopo l'avanzamento.
     /// Viene rimosso solo al ritorno al menu principale o per timeout.
     /// </summary>
-    public StepBuilder Persistent()
+    public StepBuilder<TData> Persistent()
     {
         _persistent = true;
         return this;
     }
 
     /// <summary>Nasconde il bottone "Indietro" per questo step.</summary>
-    public StepBuilder HideBack()
+    public StepBuilder<TData> HideBack()
     {
         _showBack = false;
         return this;
     }
 
     /// <summary>Nasconde il bottone "Menu" per questo step.</summary>
-    public StepBuilder HideMenu()
+    public StepBuilder<TData> HideMenu()
     {
         _showMenu = false;
         return this;
     }
 
     /// <summary>Imposta l'ordinale di esecuzione dello step (default: indice × 10).</summary>
-    public StepBuilder WithOrdinal(int ordinal)
+    public StepBuilder<TData> WithOrdinal(int ordinal)
     {
         _ordinal = ordinal;
         return this;

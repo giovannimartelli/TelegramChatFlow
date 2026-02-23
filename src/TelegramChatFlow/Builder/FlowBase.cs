@@ -14,13 +14,21 @@ public abstract class FlowBase
     public abstract string MenuLabel { get; }
 
     /// <summary>Costruisce la <see cref="FlowDefinition"/> a partire dalla configurazione.</summary>
-    public FlowDefinition Build()
+    public abstract FlowDefinition Build();
+}
+
+/// <summary>
+/// Classe base generica: ogni flusso dichiara il proprio tipo dati <typeparamref name="TData"/>.
+/// </summary>
+public abstract class FlowBase<TData> : FlowBase where TData : class, new()
+{
+    public sealed override FlowDefinition Build()
     {
-        var builder = new FlowBuilder();
+        var builder = new FlowBuilder<TData>();
         Configure(builder);
         return builder.Build(Id, MenuLabel);
     }
 
     /// <summary>Configura gli step e gli eventuali sub-flow.</summary>
-    protected abstract void Configure(FlowBuilder builder);
+    protected abstract void Configure(FlowBuilder<TData> builder);
 }

@@ -6,7 +6,7 @@ public sealed class FlowSession
     public long ChatId { get; init; }
     public string? CurrentFlowId { get; set; }
     public int CurrentStepIndex { get; set; }
-    public Dictionary<string, object?> Data { get; set; } = new();
+    public object? Data { get; set; }
     public List<int> TrackedMessageIds { get; set; } = [];
     public List<int> PersistentMessageIds { get; set; } = [];
     public int? BotMessageId { get; set; }
@@ -20,7 +20,7 @@ public sealed class FlowSession
     {
         CurrentFlowId = null;
         CurrentStepIndex = 0;
-        Data = new();
+        Data = null;
         FlowStack = new();
         StepHistory = new();
     }
@@ -30,7 +30,7 @@ public sealed class FlowSession
 public sealed class StepHistoryEntry
 {
     public required int StepIndex { get; init; }
-    public required Dictionary<string, object?> Data { get; init; }
+    public required object Data { get; init; }
 }
 
 /// <summary>Frame salvato nello stack quando si entra in un sub-flow.</summary>
@@ -38,7 +38,7 @@ public sealed class SubFlowFrame
 {
     public required string FlowId { get; init; }
     public required int StepIndex { get; init; }
-    public required Dictionary<string, object?> Data { get; init; }
+    public required object Data { get; init; }
     public required Stack<StepHistoryEntry> StepHistory { get; init; }
 }
 

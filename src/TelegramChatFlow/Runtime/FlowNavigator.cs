@@ -22,7 +22,7 @@ public sealed class FlowNavigator
 
     /// <summary>Avanza allo step successivo, al menu sub-flow, o completa il flusso.</summary>
     public async Task AdvanceAsync(FlowSession session, FlowDefinition flow,
-        Dictionary<string, object?>? dataSnapshot = null)
+        object? dataSnapshot = null)
     {
         var currentStep = flow.Steps.ElementAtOrDefault(session.CurrentStepIndex);
         if (currentStep?.Persistent == true)
@@ -31,7 +31,7 @@ public sealed class FlowNavigator
         session.StepHistory.Push(new StepHistoryEntry
         {
             StepIndex = session.CurrentStepIndex,
-            Data = dataSnapshot ?? new Dictionary<string, object?>(session.Data)
+            Data = dataSnapshot ?? flow.CloneData(session.Data!)
         });
         var next = session.CurrentStepIndex + 1;
 
@@ -88,7 +88,7 @@ public sealed class FlowNavigator
 
     /// <summary>Salta direttamente a uno step per ID.</summary>
     public async Task GoToStepAsync(FlowSession session, FlowDefinition flow, string stepId,
-        Dictionary<string, object?> dataSnapshot)
+        object dataSnapshot)
     {
         var targetIdx = -1;
         for (var i = 0; i < flow.Steps.Count; i++)
@@ -123,7 +123,7 @@ public sealed class FlowNavigator
 
         var step = flow.Steps.ElementAtOrDefault(session.CurrentStepIndex);
         if (step?.Skippable == true)
-            await AdvanceAsync(session, flow, new Dictionary<string, object?>(session.Data));
+            await AdvanceAsync(session, flow, flow.CloneData(session.Data!));
     }
 
     /// <summary>Avvia un flusso root.</summary>
@@ -133,6 +133,7 @@ public sealed class FlowNavigator
 
         session.Reset();
         session.CurrentFlowId = flowId;
+        session.Data = flow.CreateData();
 
         if (flow.Steps.Count > 0)
             await _renderer.RenderStepAsync(session, flow.Steps[0]);
@@ -140,7 +141,7 @@ public sealed class FlowNavigator
 
     /// <summary>Avvia un sub-flow dall'handler, salvando il frame corrente nello stack.</summary>
     public async Task StartSubFlowAsync(FlowSession session, string subFlowId,
-        Dictionary<string, object?> dataSnapshot)
+        object dataSnapshot)
     {
         var sub = _registry.GetFlow(subFlowId);
         if (sub is null) return;

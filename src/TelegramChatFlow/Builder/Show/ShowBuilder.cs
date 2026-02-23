@@ -1,7 +1,7 @@
 namespace TelegramChatFlow.Builder.Show;
 
 /// <summary>Builder per la configurazione del contenuto visivo di uno step.</summary>
-public sealed class ShowBuilder
+public sealed class ShowBuilder<TData> where TData : class, new()
 {
     private Func<FlowContext, Task<string>>? _text;
     private ShowMediaType? _mediaType;
@@ -10,51 +10,51 @@ public sealed class ShowBuilder
 
     // ── Text ──────────────────────────────────────────────
 
-    public ShowBuilder HasText(string text)
+    public ShowBuilder<TData> HasText(string text)
     {
         _text = _ => Task.FromResult(text);
         return this;
     }
 
-    public ShowBuilder HasText(Func<FlowContext, string> provider)
+    public ShowBuilder<TData> HasText(Func<FlowContext<TData>, string> provider)
     {
-        _text = ctx => Task.FromResult(provider(ctx));
+        _text = ctx => Task.FromResult(provider((FlowContext<TData>)ctx));
         return this;
     }
 
-    public ShowBuilder HasText(Func<FlowContext, Task<string>> provider)
+    public ShowBuilder<TData> HasText(Func<FlowContext<TData>, Task<string>> provider)
     {
-        _text = provider;
+        _text = ctx => provider((FlowContext<TData>)ctx);
         return this;
     }
 
     // ── Media ─────────────────────────────────────────────
 
-    public ShowBuilder HasPhoto(string fileId, string? caption = null) =>
+    public ShowBuilder<TData> HasPhoto(string fileId, string? caption = null) =>
         HasMedia(ShowMediaType.Photo, _ => fileId, caption is null ? null : _ => caption);
 
-    public ShowBuilder HasPhoto(Func<FlowContext, string> fileIdProvider, Func<FlowContext, string>? captionProvider = null) =>
-        HasMedia(ShowMediaType.Photo, fileIdProvider, captionProvider);
+    public ShowBuilder<TData> HasPhoto(Func<FlowContext<TData>, string> fileIdProvider, Func<FlowContext<TData>, string>? captionProvider = null) =>
+        HasMedia(ShowMediaType.Photo, ctx => fileIdProvider((FlowContext<TData>)ctx), captionProvider is null ? null : ctx => captionProvider((FlowContext<TData>)ctx));
 
-    public ShowBuilder HasVideo(string fileId, string? caption = null) =>
+    public ShowBuilder<TData> HasVideo(string fileId, string? caption = null) =>
         HasMedia(ShowMediaType.Video, _ => fileId, caption is null ? null : _ => caption);
 
-    public ShowBuilder HasVideo(Func<FlowContext, string> fileIdProvider, Func<FlowContext, string>? captionProvider = null) =>
-        HasMedia(ShowMediaType.Video, fileIdProvider, captionProvider);
+    public ShowBuilder<TData> HasVideo(Func<FlowContext<TData>, string> fileIdProvider, Func<FlowContext<TData>, string>? captionProvider = null) =>
+        HasMedia(ShowMediaType.Video, ctx => fileIdProvider((FlowContext<TData>)ctx), captionProvider is null ? null : ctx => captionProvider((FlowContext<TData>)ctx));
 
-    public ShowBuilder HasDocument(string fileId, string? caption = null) =>
+    public ShowBuilder<TData> HasDocument(string fileId, string? caption = null) =>
         HasMedia(ShowMediaType.Document, _ => fileId, caption is null ? null : _ => caption);
 
-    public ShowBuilder HasDocument(Func<FlowContext, string> fileIdProvider, Func<FlowContext, string>? captionProvider = null) =>
-        HasMedia(ShowMediaType.Document, fileIdProvider, captionProvider);
+    public ShowBuilder<TData> HasDocument(Func<FlowContext<TData>, string> fileIdProvider, Func<FlowContext<TData>, string>? captionProvider = null) =>
+        HasMedia(ShowMediaType.Document, ctx => fileIdProvider((FlowContext<TData>)ctx), captionProvider is null ? null : ctx => captionProvider((FlowContext<TData>)ctx));
 
-    public ShowBuilder HasAnimation(string fileId, string? caption = null) =>
+    public ShowBuilder<TData> HasAnimation(string fileId, string? caption = null) =>
         HasMedia(ShowMediaType.Animation, _ => fileId, caption is null ? null : _ => caption);
 
-    public ShowBuilder HasAnimation(Func<FlowContext, string> fileIdProvider, Func<FlowContext, string>? captionProvider = null) =>
-        HasMedia(ShowMediaType.Animation, fileIdProvider, captionProvider);
+    public ShowBuilder<TData> HasAnimation(Func<FlowContext<TData>, string> fileIdProvider, Func<FlowContext<TData>, string>? captionProvider = null) =>
+        HasMedia(ShowMediaType.Animation, ctx => fileIdProvider((FlowContext<TData>)ctx), captionProvider is null ? null : ctx => captionProvider((FlowContext<TData>)ctx));
 
-    private ShowBuilder HasMedia(ShowMediaType type, Func<FlowContext, string> fileIdProvider, Func<FlowContext, string>? captionProvider)
+    private ShowBuilder<TData> HasMedia(ShowMediaType type, Func<FlowContext, string> fileIdProvider, Func<FlowContext, string>? captionProvider)
     {
         _mediaType = type;
         _mediaFileId = fileIdProvider;
@@ -65,9 +65,9 @@ public sealed class ShowBuilder
     // ── Factory ─────────────────────────────────────────────
 
     /// <summary>Crea una <see cref="ShowDefinition"/> inline tramite il builder.</summary>
-    public static ShowDefinition Create(Action<ShowBuilder> configure)
+    public static ShowDefinition Create(Action<ShowBuilder<TData>> configure)
     {
-        var builder = new ShowBuilder();
+        var builder = new ShowBuilder<TData>();
         configure(builder);
         return builder.Build();
     }

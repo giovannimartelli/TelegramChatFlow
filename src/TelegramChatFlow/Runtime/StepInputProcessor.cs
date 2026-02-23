@@ -58,9 +58,9 @@ public sealed class StepInputProcessor
             return;
 
         // Snapshot dei dati prima che l'handler li modifichi (per il back)
-        var dataSnapshot = new Dictionary<string, object?>(session.Data);
+        var dataSnapshot = flow.CloneData(session.Data!);
 
-        var context = new FlowContext { Data = session.Data };
+        var context = flow.CreateContext(session.Data!);
 
         StepResult result;
         try
@@ -75,7 +75,7 @@ public sealed class StepInputProcessor
             result = StepResult.Retry;
         }
 
-        session.Data = context.Data;
+        session.Data = context.FlowData;
 
         switch (result)
         {

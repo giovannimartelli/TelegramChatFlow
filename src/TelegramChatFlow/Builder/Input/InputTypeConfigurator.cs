@@ -3,94 +3,94 @@ using TelegramChatFlow.Builder.Step;
 namespace TelegramChatFlow.Builder.Input;
 
 /// <summary>Configuratore del tipo di input atteso da uno step.</summary>
-public sealed class InputTypeConfigurator
+public sealed class InputTypeConfigurator<TData> where TData : class, new()
 {
-    private readonly StepBuilder _parent;
+    private readonly StepBuilder<TData> _parent;
 
-    internal InputTypeConfigurator(StepBuilder parent) => _parent = parent;
+    internal InputTypeConfigurator(StepBuilder<TData> parent) => _parent = parent;
 
     // ── Buttons ──────────────────────────────────────────
 
-    public InputBuilder<string> UsingButtons(params InlineButton[] buttons)
+    public InputBuilder<string, TData> UsingButtons(params InlineButton[] buttons)
     {
         _parent.SetInputType(InputType.InlineButtons);
         _parent.SetButtonsProvider(_ => Task.FromResult<IReadOnlyList<InlineButton>>(buttons));
-        return new InputBuilder<string>(_parent, input => input.CallbackData!);
+        return new InputBuilder<string, TData>(_parent, input => input.CallbackData!);
     }
 
-    public InputBuilder<string> UsingButtons(Func<FlowContext, IReadOnlyList<InlineButton>> provider)
+    public InputBuilder<string, TData> UsingButtons(Func<FlowContext<TData>, IReadOnlyList<InlineButton>> provider)
     {
         _parent.SetInputType(InputType.InlineButtons);
-        _parent.SetButtonsProvider(ctx => Task.FromResult(provider(ctx)));
-        return new InputBuilder<string>(_parent, input => input.CallbackData!);
+        _parent.SetButtonsProvider(ctx => Task.FromResult(provider((FlowContext<TData>)ctx)));
+        return new InputBuilder<string, TData>(_parent, input => input.CallbackData!);
     }
 
-    public InputBuilder<string> UsingButtons(Func<FlowContext, Task<IReadOnlyList<InlineButton>>> provider)
+    public InputBuilder<string, TData> UsingButtons(Func<FlowContext<TData>, Task<IReadOnlyList<InlineButton>>> provider)
     {
         _parent.SetInputType(InputType.InlineButtons);
-        _parent.SetButtonsProvider(provider);
-        return new InputBuilder<string>(_parent, input => input.CallbackData!);
+        _parent.SetButtonsProvider(ctx => provider((FlowContext<TData>)ctx));
+        return new InputBuilder<string, TData>(_parent, input => input.CallbackData!);
     }
 
     // ── Text ─────────────────────────────────────────────
 
-    public InputBuilder<string> UsingText()
+    public InputBuilder<string, TData> UsingText()
     {
         _parent.SetInputType(InputType.Text);
-        return new InputBuilder<string>(_parent, input => input.Text!);
+        return new InputBuilder<string, TData>(_parent, input => input.Text!);
     }
 
     // ── Media ─────────────────────────────────────────────
 
-    public InputBuilder<InputMedia> UsingMedia()
+    public InputBuilder<InputMedia, TData> UsingMedia()
     {
         _parent.SetInputType(InputType.Media);
-        return new InputBuilder<InputMedia>(_parent, input => input.Media!);
+        return new InputBuilder<InputMedia, TData>(_parent, input => input.Media!);
     }
 
     // ── WebApp ───────────────────────────────────────────
 
-    public InputBuilder<string> UsingWebApp(string url)
+    public InputBuilder<string, TData> UsingWebApp(string url)
     {
         _parent.SetInputType(InputType.WebApp);
         _parent.SetWebAppUrlProvider(_ => Task.FromResult(url));
-        return new InputBuilder<string>(_parent, input => input.WebAppData!);
+        return new InputBuilder<string, TData>(_parent, input => input.WebAppData!);
     }
 
-    public InputBuilder<string> UsingWebApp(Func<FlowContext, string> urlProvider)
+    public InputBuilder<string, TData> UsingWebApp(Func<FlowContext<TData>, string> urlProvider)
     {
         _parent.SetInputType(InputType.WebApp);
-        _parent.SetWebAppUrlProvider(ctx => Task.FromResult(urlProvider(ctx)));
-        return new InputBuilder<string>(_parent, input => input.WebAppData!);
+        _parent.SetWebAppUrlProvider(ctx => Task.FromResult(urlProvider((FlowContext<TData>)ctx)));
+        return new InputBuilder<string, TData>(_parent, input => input.WebAppData!);
     }
 
-    public InputBuilder<string> UsingWebApp(Func<FlowContext, Task<string>> urlProvider)
+    public InputBuilder<string, TData> UsingWebApp(Func<FlowContext<TData>, Task<string>> urlProvider)
     {
         _parent.SetInputType(InputType.WebApp);
-        _parent.SetWebAppUrlProvider(urlProvider);
-        return new InputBuilder<string>(_parent, input => input.WebAppData!);
+        _parent.SetWebAppUrlProvider(ctx => urlProvider((FlowContext<TData>)ctx));
+        return new InputBuilder<string, TData>(_parent, input => input.WebAppData!);
     }
 
     // ── Reply Keyboard ───────────────────────────────────
 
-    public InputBuilder<string> UsingKeyboard(params string[] buttons)
+    public InputBuilder<string, TData> UsingKeyboard(params string[] buttons)
     {
         _parent.SetInputType(InputType.ReplyKeyboard);
         _parent.SetReplyKeyboardProvider(_ => Task.FromResult<IReadOnlyList<string>>(buttons));
-        return new InputBuilder<string>(_parent, input => input.Text!);
+        return new InputBuilder<string, TData>(_parent, input => input.Text!);
     }
 
-    public InputBuilder<string> UsingKeyboard(Func<FlowContext, IReadOnlyList<string>> provider)
+    public InputBuilder<string, TData> UsingKeyboard(Func<FlowContext<TData>, IReadOnlyList<string>> provider)
     {
         _parent.SetInputType(InputType.ReplyKeyboard);
-        _parent.SetReplyKeyboardProvider(ctx => Task.FromResult(provider(ctx)));
-        return new InputBuilder<string>(_parent, input => input.Text!);
+        _parent.SetReplyKeyboardProvider(ctx => Task.FromResult(provider((FlowContext<TData>)ctx)));
+        return new InputBuilder<string, TData>(_parent, input => input.Text!);
     }
 
-    public InputBuilder<string> UsingKeyboard(Func<FlowContext, Task<IReadOnlyList<string>>> provider)
+    public InputBuilder<string, TData> UsingKeyboard(Func<FlowContext<TData>, Task<IReadOnlyList<string>>> provider)
     {
         _parent.SetInputType(InputType.ReplyKeyboard);
-        _parent.SetReplyKeyboardProvider(provider);
-        return new InputBuilder<string>(_parent, input => input.Text!);
+        _parent.SetReplyKeyboardProvider(ctx => provider((FlowContext<TData>)ctx));
+        return new InputBuilder<string, TData>(_parent, input => input.Text!);
     }
 }

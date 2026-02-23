@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using TelegramChatFlow.Builder;
 using TelegramChatFlow.Builder.Flow;
 
@@ -9,14 +10,42 @@ namespace TelegramChatFlow.Example.Flows;
 /// Dimostra: bottoni inline, reply keyboard, text input con validazione,
 /// media input/output, Persistent, Skippable, GoTo, testo dinamico, sub-flow handler-launched.
 /// </summary>
-public sealed class AnnuncioFlow : FlowBase
+public sealed class AnnuncioFlow : FlowBase<AnnuncioFlow.AnnuncioData>
 {
-    private record FotoInfo(string FileId, string Descrizione, string Tag);
+    public sealed class AnnuncioData
+    {
+        public string? Tipo { get; set; }
+        public string? Zona { get; set; }
+        public string? Descrizione { get; set; }
+        public int? Prezzo { get; set; }
+        public List<FotoInfo> FotoLista { get; set; } = [];
+        public string? FotoTmpId { get; set; }
+        public string? FotoTmpDesc { get; set; }
+        public string? AllegatoId { get; set; }
+        public string? AllegatoNome { get; set; }
+    }
+
+    public sealed class FotoInfo
+    {
+        public string FileId { get; set; } = "";
+        public string Descrizione { get; set; } = "";
+        public string Tag { get; set; } = "";
+
+        [JsonConstructor]
+        public FotoInfo() { }
+
+        public FotoInfo(string fileId, string descrizione, string tag)
+        {
+            FileId = fileId;
+            Descrizione = descrizione;
+            Tag = tag;
+        }
+    }
 
     public override string Id => "annuncio";
     public override string MenuLabel => "🏠 Nuovo Annuncio";
 
-    protected override void Configure(FlowBuilder builder)
+    protected override void Configure(FlowBuilder<AnnuncioData> builder)
     {
         builder
             // ── Step 1: tipo immobile (inline buttons, HideBack) ──
@@ -31,7 +60,7 @@ public sealed class AnnuncioFlow : FlowBase
                         new InlineButton("🏪 Locale Commerciale", "locale"))
                     .OnInput((ctx, tipo) =>
                     {
-                        ctx.Set("tipo", tipo);
+                        ctx.Data.Tipo = tipo;
                     })))
 
             // ── Step 2: zona (reply keyboard) ─────────────────────
@@ -41,15 +70,15 @@ public sealed class AnnuncioFlow : FlowBase
                     .UsingKeyboard("Centro", "Collina", "Periferia", "Mare", "Campagna")
                     .OnInput((ctx, zona) =>
                     {
-                        ctx.Set("zona", zona);
+                        ctx.Data.Zona = zona;
                     })))
 
             // ── Step 3: descrizione (text + validazione min 20 char, testo dinamico) ──
             .Step("descrizione", step => step
                 .Show(s => s.HasText(ctx =>
                 {
-                    var tipo = FormatTipo(ctx.Get<string>("tipo"));
-                    var zona = ctx.Get<string>("zona");
+                    var tipo = FormatTipo(ctx.Data.Tipo);
+                    var zona = ctx.Data.Zona;
                     return $"Tipo: {tipo}\nZona: {zona}\n\n" +
                            "Scrivi una descrizione dell'immobile (minimo 20 caratteri):";
                 }))
@@ -62,7 +91,7 @@ public sealed class AnnuncioFlow : FlowBase
                             ctx.ValidationError = "La descrizione deve essere di almeno 20 caratteri.";
                             return StepResult.Retry;
                         }
-                        ctx.Set("descrizione", text);
+                        ctx.Data.Descrizione = text;
                         return StepResult.Next;
                     })))
 
@@ -78,7 +107,7 @@ public sealed class AnnuncioFlow : FlowBase
                             ctx.ValidationError = "Inserisci un prezzo valido (numero intero maggiore di 0).";
                             return StepResult.Retry;
                         }
-                        ctx.Set("prezzo", prezzo);
+                        ctx.Data.Prezzo = prezzo;
                         return StepResult.Next;
                     })))
 
@@ -93,7 +122,7 @@ public sealed class AnnuncioFlow : FlowBase
             .Step("conferma_foto", step => step
                 .Show(s => s.HasText(ctx =>
                 {
-                    var lista = ctx.Get<List<FotoInfo>>("foto_lista");
+                    var lista = ctx.Data.FotoLista;
                     var sb = new StringBuilder();
                     sb.AppendLine($"📸 {lista.Count} foto caricate:\n");
                     for (var i = 0; i < lista.Count; i++)
@@ -117,23 +146,23 @@ public sealed class AnnuncioFlow : FlowBase
                     .UsingMedia()
                     .OnInput((ctx, media) =>
                     {
-                        ctx.Set("allegato_id", media.FileId);
-                        ctx.Set("allegato_nome", media.FileName ?? "documento");
+                        ctx.Data.AllegatoId = media.FileId;
+                        ctx.Data.AllegatoNome = media.FileName ?? "documento";
                     })))
 
             // ── Step 8: riepilogo (testo dinamico + media output + GoTo/Exit) ──
             .Step("riepilogo", step => step
                 .Show(s => s
                     .HasPhoto(
-                        ctx => ctx.Get<List<FotoInfo>>("foto_lista")[0].FileId,
+                        ctx => ctx.Data.FotoLista[0].FileId,
                         ctx =>
                         {
-                            var tipo = FormatTipo(ctx.Get<string>("tipo"));
-                            var zona = ctx.Get<string>("zona");
-                            var desc = ctx.Get<string>("descrizione");
-                            var prezzo = ctx.Get<int>("prezzo");
-                            var fotoCount = ctx.Get<List<FotoInfo>>("foto_lista").Count;
-                            var allegato = ctx.TryGet<string>("allegato_nome");
+                            var tipo = FormatTipo(ctx.Data.Tipo);
+                            var zona = ctx.Data.Zona;
+                            var desc = ctx.Data.Descrizione;
+                            var prezzo = ctx.Data.Prezzo;
+                            var fotoCount = ctx.Data.FotoLista.Count;
+                            var allegato = ctx.Data.AllegatoNome;
 
                             return $"📋 Riepilogo Annuncio\n\n" +
                                    $"🏠 Tipo: {tipo}\n" +
@@ -174,12 +203,12 @@ public sealed class AnnuncioFlow : FlowBase
     };
 
     // ── Sub-flow: Foto con dettagli (loop multi-foto) ──────────
-    private sealed class FotoDettagliFlow : FlowBase
+    private sealed class FotoDettagliFlow : FlowBase<AnnuncioData>
     {
         public override string Id => "foto_dettagli";
         public override string MenuLabel => "📸 Foto Dettagli";
 
-        protected override void Configure(FlowBuilder builder)
+        protected override void Configure(FlowBuilder<AnnuncioData> builder)
         {
             builder
                 // Upload foto
@@ -190,7 +219,7 @@ public sealed class AnnuncioFlow : FlowBase
                         .UsingMedia()
                         .OnInput((ctx, media) =>
                         {
-                            ctx.Set("_foto_tmp_id", media.FileId);
+                            ctx.Data.FotoTmpId = media.FileId;
                         })))
 
                 // Descrizione foto
@@ -200,7 +229,7 @@ public sealed class AnnuncioFlow : FlowBase
                         .UsingText()
                         .OnInput((ctx, text) =>
                         {
-                            ctx.Set("_foto_tmp_desc", text);
+                            ctx.Data.FotoTmpDesc = text;
                         })))
 
                 // Tag foto + accumula nella lista
@@ -211,19 +240,17 @@ public sealed class AnnuncioFlow : FlowBase
                         .OnInput((ctx, text) =>
                         {
                             var foto = new FotoInfo(
-                                ctx.Get<string>("_foto_tmp_id"),
-                                ctx.Get<string>("_foto_tmp_desc"),
+                                ctx.Data.FotoTmpId!,
+                                ctx.Data.FotoTmpDesc!,
                                 text);
-                            var lista = ctx.TryGet<List<FotoInfo>>("foto_lista") ?? new List<FotoInfo>();
-                            lista.Add(foto);
-                            ctx.Set("foto_lista", lista);
+                            ctx.Data.FotoLista.Add(foto);
                         })))
 
                 // Chiedi se aggiungere un'altra foto
                 .Step("altra_foto", step => step
                     .Show(s => s.HasText(ctx =>
                     {
-                        var count = ctx.Get<List<FotoInfo>>("foto_lista").Count;
+                        var count = ctx.Data.FotoLista.Count;
                         return $"📸 {count} foto caricata/e. Vuoi aggiungerne un'altra?";
                     }))
                     .Input(i => i

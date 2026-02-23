@@ -37,7 +37,8 @@ public sealed class StepRenderer
             session.HasReplyKeyboard = false;
         }
 
-        var ctx = new FlowContext { Data = session.Data };
+        var flow = _registry.GetFlow(session.CurrentFlowId!);
+        var ctx = flow!.CreateContext(session.Data!);
         var show = showOverride ?? step.Show;
 
         switch (show.ContentType)

@@ -7,12 +7,19 @@ namespace TelegramChatFlow.Example.Flows;
 /// Flusso di esempio a 4 step: categoria → messaggio → conferma → risultato.
 /// Dimostra l'uso di bottoni inline, input testuale, validazione, riepilogo e step display-only.
 /// </summary>
-public sealed class FeedbackFlow : FlowBase
+public sealed class FeedbackFlow : FlowBase<FeedbackFlow.FeedbackData>
 {
     public override string Id => "feedback";
     public override string MenuLabel => "📝 Feedback";
 
-    protected override void Configure(FlowBuilder builder)
+    public sealed class FeedbackData
+    {
+        public string? Category { get; set; }
+        public string? Message { get; set; }
+        public bool Cancelled { get; set; }
+    }
+
+    protected override void Configure(FlowBuilder<FeedbackData> builder)
     {
         builder
             // ── Step 1: selezione categoria ──────────────
@@ -25,14 +32,14 @@ public sealed class FeedbackFlow : FlowBase
                         new InlineButton("⭐ Complimento", "praise"))
                     .OnInput((ctx, callbackData) =>
                     {
-                        ctx.Set("category", callbackData);
+                        ctx.Data.Category = callbackData;
                     })))
 
             // ── Step 2: messaggio testuale ───────────────
             .Step("message", step => step
                 .Show(s => s.HasText(ctx =>
                 {
-                    var label = FormatCategory(ctx.Get<string>("category"));
+                    var label = FormatCategory(ctx.Data.Category);
                     return $"Categoria: {label}\n\nScrivi il tuo messaggio:";
                 }))
                 .Input(i => i
@@ -44,7 +51,7 @@ public sealed class FeedbackFlow : FlowBase
                             ctx.ValidationError = "Il messaggio non può essere vuoto.";
                             return StepResult.Retry;
                         }
-                        ctx.Set("message", text);
+                        ctx.Data.Message = text;
                         return StepResult.Next;
                     })))
 
@@ -52,8 +59,8 @@ public sealed class FeedbackFlow : FlowBase
             .Step("confirm", step => step
                 .Show(s => s.HasText(ctx =>
                 {
-                    var label = FormatCategory(ctx.Get<string>("category"));
-                    var msg = ctx.Get<string>("message");
+                    var label = FormatCategory(ctx.Data.Category);
+                    var msg = ctx.Data.Message;
                     return $"📋 Riepilogo\n\n" +
                            $"Categoria: {label}\n" +
                            $"Messaggio: {msg}\n\n" +
@@ -67,19 +74,17 @@ public sealed class FeedbackFlow : FlowBase
                     {
                         if (callbackData == "cancel")
                         {
-                            ctx.Set("cancelled", true);
+                            ctx.Data.Cancelled = true;
                             return StepResult.Next;
                         }
                         // Qui salveresti il feedback su DB, invieresti una notifica, ecc.
-                        var cat = ctx.Get<string>("category");
-                        var msg = ctx.Get<string>("message");
-                        Console.WriteLine($"[Feedback ricevuto] Categoria: {cat} | Messaggio: {msg}");
+                        Console.WriteLine($"[Feedback ricevuto] Categoria: {ctx.Data.Category} | Messaggio: {ctx.Data.Message}");
                         return StepResult.Next;
                     })))
 
             // ── Step 4: risultato (display-only) ─────────
             .Step("result", step => step
-                .Show(s => s.HasText(ctx => ctx.TryGet<bool>("cancelled")
+                .Show(s => s.HasText(ctx => ctx.Data.Cancelled
                     ? "❌ Oh nooo, hai annullato!"
                     : "✅ OOOOK MANDATO, feedback inviato!")));
     }
