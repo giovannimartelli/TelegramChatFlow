@@ -1,4 +1,6 @@
-namespace TelegramChatFlow.Builder;
+using TelegramChatFlow.Builder.Step;
+
+namespace TelegramChatFlow.Builder.Flow;
 
 /// <summary>Builder fluent per la definizione di un flusso.</summary>
 public sealed class FlowBuilder
@@ -9,7 +11,8 @@ public sealed class FlowBuilder
     /// <summary>Aggiunge uno step al flusso.</summary>
     public FlowBuilder Step(string id, Action<StepBuilder> configure)
     {
-        var sb = new StepBuilder(id);
+        var defaultOrdinal = _steps.Count * 10;
+        var sb = new StepBuilder(id, defaultOrdinal);
         configure(sb);
         _steps.Add(sb.Build());
         return this;
@@ -26,7 +29,7 @@ public sealed class FlowBuilder
     {
         Id = id,
         Label = label,
-        Steps = _steps,
+        Steps = [.._steps.OrderBy(s => s.Ordinal)],
         SubFlows = _subFlows.Count > 0 ? _subFlows : null
     };
 }
