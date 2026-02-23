@@ -19,6 +19,9 @@ public abstract class StepResult
     /// <summary>Salta direttamente allo step con l'id specificato.</summary>
     public static StepResult GoTo(string stepId) => new GoToResult(stepId);
 
+    /// <summary>Lancia un sub-flow dall'handler corrente.</summary>
+    public static StepResult SubFlow(string subFlowId) => new SubFlowResult(subFlowId);
+
     /// <summary>Resta sullo step corrente mostrando un contenuto visivo diverso.</summary>
     public static StepResult RetryWith(ShowDefinition show) => new RetryResult { Show = show };
 
@@ -53,5 +56,15 @@ public abstract class StepResult
         }
 
         public string StepId { get; }
+    }
+
+    public sealed class SubFlowResult : StepResult
+    {
+        internal SubFlowResult(string subFlowId)
+        {
+            SubFlowId = subFlowId;
+        }
+
+        public string SubFlowId { get; }
     }
 }

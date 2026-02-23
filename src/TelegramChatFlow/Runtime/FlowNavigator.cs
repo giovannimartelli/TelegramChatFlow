@@ -40,11 +40,6 @@ public sealed class FlowNavigator
             session.CurrentStepIndex = next;
             await _renderer.RenderStepAsync(session, flow.Steps[next]);
         }
-        else if (flow.SubFlows is { Count: > 0 })
-        {
-            session.CurrentStepIndex = flow.Steps.Count;
-            await _renderer.ShowSubFlowMenuAsync(session, flow);
-        }
         else
         {
             await CompleteCurrentFlowAsync(session);
@@ -80,8 +75,8 @@ public sealed class FlowNavigator
             session.StepHistory = frame.StepHistory;
 
             var parent = _registry.GetFlow(frame.FlowId);
-            if (parent?.SubFlows is { Count: > 0 })
-                await _renderer.ShowSubFlowMenuAsync(session, parent);
+            if (parent is not null)
+                await _renderer.RenderStepAsync(session, parent.Steps[frame.StepIndex]);
             else
                 await ResetToMenuAsync(session);
         }
@@ -136,42 +131,34 @@ public sealed class FlowNavigator
     {
         if (!_registry.TryGetRootFlow(flowId, out var flow)) return;
 
+        session.Reset();
         session.CurrentFlowId = flowId;
-        session.CurrentStepIndex = 0;
-        session.Data = new();
-        session.FlowStack = new();
-        session.StepHistory = new();
 
         if (flow.Steps.Count > 0)
             await _renderer.RenderStepAsync(session, flow.Steps[0]);
-        else if (flow.SubFlows is { Count: > 0 })
-            await _renderer.ShowSubFlowMenuAsync(session, flow);
     }
 
-    /// <summary>Avvia un sub-flow, salvando il frame corrente nello stack.</summary>
-    public async Task StartSubFlowAsync(FlowSession session, string subFlowId)
+    /// <summary>Avvia un sub-flow dall'handler, salvando il frame corrente nello stack.</summary>
+    public async Task StartSubFlowAsync(FlowSession session, string subFlowId,
+        Dictionary<string, object?> dataSnapshot)
     {
-        var current = _registry.GetFlow(session.CurrentFlowId!);
-        var sub = current?.SubFlows?.FirstOrDefault(s => s.Id == subFlowId);
+        var sub = _registry.GetFlow(subFlowId);
         if (sub is null) return;
 
         session.FlowStack.Push(new SubFlowFrame
         {
             FlowId = session.CurrentFlowId!,
             StepIndex = session.CurrentStepIndex,
-            Data = new Dictionary<string, object?>(session.Data),
+            Data = dataSnapshot,
             StepHistory = session.StepHistory
         });
 
         session.CurrentFlowId = subFlowId;
         session.CurrentStepIndex = 0;
-        session.Data = new();
         session.StepHistory = new();
 
         if (sub.Steps.Count > 0)
             await _renderer.RenderStepAsync(session, sub.Steps[0]);
-        else if (sub.SubFlows is { Count: > 0 })
-            await _renderer.ShowSubFlowMenuAsync(session, sub);
     }
 
     /// <summary>Completa il flusso corrente e torna al genitore o al menu.</summary>
@@ -182,13 +169,10 @@ public sealed class FlowNavigator
             var frame = session.FlowStack.Pop();
             session.CurrentFlowId = frame.FlowId;
             session.CurrentStepIndex = frame.StepIndex;
-            session.Data = frame.Data;
             session.StepHistory = frame.StepHistory;
 
             var parent = _registry.GetFlow(frame.FlowId);
-            if (parent?.SubFlows is { Count: > 0 })
-                await _renderer.ShowSubFlowMenuAsync(session, parent);
-            else if (parent is not null)
+            if (parent is not null)
                 await AdvanceAsync(session, parent);
             else
                 await ResetToMenuAsync(session);
@@ -210,11 +194,7 @@ public sealed class FlowNavigator
             session.HasReplyKeyboard = false;
         }
 
-        session.CurrentFlowId = null;
-        session.CurrentStepIndex = 0;
-        session.Data = new();
-        session.FlowStack = new();
-        session.StepHistory = new();
+        session.Reset();
 
         await _renderer.ShowMenuAsync(session);
     }

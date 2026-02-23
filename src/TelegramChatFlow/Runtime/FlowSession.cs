@@ -14,6 +14,16 @@ public sealed class FlowSession
     public DateTime LastActivity { get; set; } = DateTime.UtcNow;
     public Stack<SubFlowFrame> FlowStack { get; set; } = new();
     public Stack<StepHistoryEntry> StepHistory { get; set; } = new();
+
+    /// <summary>Azzera lo stato del flusso corrente.</summary>
+    public void Reset()
+    {
+        CurrentFlowId = null;
+        CurrentStepIndex = 0;
+        Data = new();
+        FlowStack = new();
+        StepHistory = new();
+    }
 }
 
 /// <summary>Entry nello stack di navigazione: indice dello step + snapshot dei dati prima della transizione.</summary>

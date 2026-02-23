@@ -20,7 +20,8 @@ builder.Services
         options.WatchdogInterval = TimeSpan.FromSeconds(30);
         
     })
-    .AddFlow<FeedbackFlow>();
+    .AddFlow<FeedbackFlow>()
+    .AddFlow<AnnuncioFlow>();
 
 var app = builder.Build();
 await app.RunAsync();

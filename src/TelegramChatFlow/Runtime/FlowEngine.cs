@@ -162,12 +162,6 @@ public sealed class FlowEngine
             return;
         }
 
-        if (data.StartsWith("sub:"))
-        {
-            await _navigator.StartSubFlowAsync(session, data[4..]);
-            return;
-        }
-
         if (session.CurrentFlowId is not null)
             await _inputProcessor.ProcessStepInputAsync(session, new UserInput { CallbackData = data });
     }
@@ -211,11 +205,7 @@ public sealed class FlowEngine
             session.HasReplyKeyboard = false;
         }
 
-        session.CurrentFlowId = null;
-        session.CurrentStepIndex = 0;
-        session.Data = new();
-        session.FlowStack = new();
-        session.StepHistory = new();
+        session.Reset();
         session.TrackedMessageIds.Clear();
         session.PersistentMessageIds.Clear();
         session.HasReplyKeyboard = false;

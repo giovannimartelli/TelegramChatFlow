@@ -29,28 +29,16 @@ public sealed class MessageManager
     {
         if (session.BotMessageId.HasValue)
         {
-            try
-            {
-                await _bot.EditMessageText(
-                    session.ChatId,
-                    session.BotMessageId.Value,
-                    text,
-                    replyMarkup: markup);
-                return;
-            }
-            catch (ApiRequestException ex) when (ex.Message.Contains("message is not modified"))
-            {
-                return; // contenuto identico, nessuna azione
-            }
-            catch (ApiRequestException ex)
-            {
-                _logger.LogWarning(ex,
-                    "Impossibile editare messaggio {MsgId} per chat {ChatId}, ne invio uno nuovo",
-                    session.BotMessageId, session.ChatId);
-            }
+            var edited = await TryEditAsync(() => _bot.EditMessageText(
+                session.ChatId,
+                session.BotMessageId.Value,
+                text,
+                replyMarkup: markup));
+            if (edited) return;
         }
 
-        await SendNewBotMessageAsync(session, text, markup);
+        await ReplaceBotMessageAsync(session,
+            _bot.SendMessage(session.ChatId, text, replyMarkup: markup));
     }
 
     /// <summary>Invia un messaggio aggiuntivo con reply keyboard (tracciato per la pulizia).</summary>
@@ -143,28 +131,16 @@ public sealed class MessageManager
     {
         if (session.BotMessageId.HasValue)
         {
-            try
-            {
-                await _bot.EditMessageMedia(
-                    session.ChatId,
-                    session.BotMessageId.Value,
-                    ToInputMedia(showMediaType, fileId, caption),
-                    replyMarkup: markup);
-                return;
-            }
-            catch (ApiRequestException ex) when (ex.Message.Contains("message is not modified"))
-            {
-                return;
-            }
-            catch (ApiRequestException ex)
-            {
-                _logger.LogWarning(ex,
-                    "Impossibile editare media {MsgId} per chat {ChatId}, ne invio uno nuovo",
-                    session.BotMessageId, session.ChatId);
-            }
+            var edited = await TryEditAsync(() => _bot.EditMessageMedia(
+                session.ChatId,
+                session.BotMessageId.Value,
+                ToInputMedia(showMediaType, fileId, caption),
+                replyMarkup: markup));
+            if (edited) return;
         }
 
-        await SendNewBotMediaMessageAsync(session, showMediaType, fileId, caption, markup);
+        await ReplaceBotMessageAsync(session,
+            SendMediaMessageAsync(session.ChatId, showMediaType, fileId, caption, markup));
     }
 
     /// <summary>Invia un media aggiuntivo (senza markup) tracciato per la pulizia.</summary>
@@ -174,20 +150,27 @@ public sealed class MessageManager
         session.TrackedMessageIds.Add(msg.MessageId);
     }
 
-    private async Task SendNewBotMessageAsync(FlowSession session, string text, InlineKeyboardMarkup? markup)
+    private async Task<bool> TryEditAsync(Func<Task> editAction)
     {
-        var msg = await _bot.SendMessage(session.ChatId, text, replyMarkup: markup);
-
-        if (session.BotMessageId.HasValue)
-            await TryDeleteAsync(session.ChatId, session.BotMessageId.Value);
-
-        session.BotMessageId = msg.MessageId;
+        try
+        {
+            await editAction();
+            return true;
+        }
+        catch (ApiRequestException ex) when (ex.Message.Contains("message is not modified"))
+        {
+            return true; // contenuto identico, nessuna azione
+        }
+        catch (ApiRequestException ex)
+        {
+            _logger.LogWarning(ex, "Impossibile editare messaggio, ne invio uno nuovo");
+            return false;
+        }
     }
 
-    private async Task SendNewBotMediaMessageAsync(
-        FlowSession session, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
+    private async Task ReplaceBotMessageAsync(FlowSession session, Task<Message> sendTask)
     {
-        var msg = await SendMediaMessageAsync(session.ChatId, showMediaType, fileId, caption, markup);
+        var msg = await sendTask;
 
         if (session.BotMessageId.HasValue)
             await TryDeleteAsync(session.ChatId, session.BotMessageId.Value);

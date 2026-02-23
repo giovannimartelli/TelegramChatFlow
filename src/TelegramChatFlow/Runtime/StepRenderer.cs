@@ -5,7 +5,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// Rendering degli step, menu principale e sub-flow menu.
+/// Rendering degli step e menu principale.
 /// Costruisce anche le tastiere inline e di navigazione.
 /// </summary>
 public sealed class StepRenderer
@@ -49,7 +49,7 @@ public sealed class StepRenderer
 
                 if (step.InputType == InputType.ReplyKeyboard && step.ReplyKeyboardProvider is not null)
                 {
-                    var nav = BuildNavigationKeyboard(session, step);
+                    var nav = new InlineKeyboardMarkup([BuildNavigationRow(session, step)]);
                     await _messages.SendOrEditAsync(session, text, nav);
 
                     var buttons = await step.ReplyKeyboardProvider(ctx);
@@ -90,30 +90,6 @@ public sealed class StepRenderer
         }
     }
 
-    /// <summary>Mostra il menu dei sub-flow di un flusso.</summary>
-    public async Task ShowSubFlowMenuAsync(FlowSession session, FlowDefinition flow)
-    {
-        await _messages.CleanupTransientMessagesAsync(session);
-
-        var text = $"📂 {flow.Label}\n\nSeleziona un'opzione:";
-        var rows = new List<List<InlineKeyboardButton>>();
-
-        foreach (var sub in flow.SubFlows ?? [])
-            rows.Add([InlineKeyboardButton.WithCallbackData(sub.Label, $"sub:{sub.Id}")]);
-
-        var nav = new List<InlineKeyboardButton>();
-
-        if (flow.Steps.Count > 0)
-            nav.Add(InlineKeyboardButton.WithCallbackData("◀️ Indietro", "nav:back"));
-        else if (session.FlowStack.Count > 0)
-            nav.Add(InlineKeyboardButton.WithCallbackData("◀️ Indietro", "nav:subdone"));
-
-        nav.Add(InlineKeyboardButton.WithCallbackData("🏠 Menu", "nav:menu"));
-        rows.Add(nav);
-
-        await _messages.SendOrEditAsync(session, text, new InlineKeyboardMarkup(rows));
-    }
-
     /// <summary>Mostra il menu principale con tutti i flussi root.</summary>
     public async Task ShowMenuAsync(FlowSession session)
     {
@@ -145,11 +121,6 @@ public sealed class StepRenderer
 
         rows.Add(BuildNavigationRow(session, step));
         return new InlineKeyboardMarkup(rows);
-    }
-
-    private InlineKeyboardMarkup BuildNavigationKeyboard(FlowSession session, StepDefinition? step)
-    {
-        return new InlineKeyboardMarkup([BuildNavigationRow(session, step)]);
     }
 
     private List<InlineKeyboardButton> BuildNavigationRow(FlowSession session, StepDefinition? step)

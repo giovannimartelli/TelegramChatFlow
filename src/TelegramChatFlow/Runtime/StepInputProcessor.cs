@@ -44,7 +44,6 @@ public sealed class StepInputProcessor
         {
             InputType.Text when input.Text is null => "Invia un messaggio di testo.",
             InputType.Media when input.Media is null => "Invia un file multimediale.",
-            InputType.InlineButtons when input.CallbackData is null => null,
             _ => null
         };
 
@@ -91,6 +90,9 @@ public sealed class StepInputProcessor
                 break;
             case StepResult.GoToResult { StepId: var targetId }:
                 await _navigator.GoToStepAsync(session, flow, targetId, dataSnapshot);
+                break;
+            case StepResult.SubFlowResult { SubFlowId: var subFlowId }:
+                await _navigator.StartSubFlowAsync(session, subFlowId, dataSnapshot);
                 break;
             case StepResult.ExitResult:
                 await _navigator.ResetToMenuAsync(session);
