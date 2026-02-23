@@ -9,8 +9,8 @@ namespace TelegramChatFlow.Example.Flows;
 /// </summary>
 public sealed class FeedbackFlow : FlowBase<FeedbackFlow.FeedbackData>
 {
-    public override string Id => "feedback";
-    public override string MenuLabel => "📝 Feedback";
+    protected override string Id => "feedback";
+    protected override string MenuLabel => "📝 Feedback";
 
     public sealed class FeedbackData
     {

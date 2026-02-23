@@ -42,8 +42,8 @@ public sealed class AnnuncioFlow : FlowBase<AnnuncioFlow.AnnuncioData>
         }
     }
 
-    public override string Id => "annuncio";
-    public override string MenuLabel => "🏠 Nuovo Annuncio";
+    protected override string Id => "annuncio";
+    protected override string MenuLabel => "🏠 Nuovo Annuncio";
 
     protected override void Configure(FlowBuilder<AnnuncioData> builder)
     {
@@ -205,8 +205,8 @@ public sealed class AnnuncioFlow : FlowBase<AnnuncioFlow.AnnuncioData>
     // ── Sub-flow: Foto con dettagli (loop multi-foto) ──────────
     private sealed class FotoDettagliFlow : FlowBase<AnnuncioData>
     {
-        public override string Id => "foto_dettagli";
-        public override string MenuLabel => "📸 Foto Dettagli";
+        protected override string Id => "foto_dettagli";
+        protected override string MenuLabel => "📸 Foto Dettagli";
 
         protected override void Configure(FlowBuilder<AnnuncioData> builder)
         {

@@ -8,10 +8,10 @@ namespace TelegramChatFlow.Builder;
 public abstract class FlowBase
 {
     /// <summary>Identificativo univoco del flusso.</summary>
-    public abstract string Id { get; }
+    protected abstract string Id { get; }
 
     /// <summary>Etichetta mostrata nel menu.</summary>
-    public abstract string MenuLabel { get; }
+    protected abstract string MenuLabel { get; }
 
     /// <summary>Costruisce la <see cref="FlowDefinition"/> a partire dalla configurazione.</summary>
     public abstract FlowDefinition Build();
