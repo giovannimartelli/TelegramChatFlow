@@ -18,7 +18,7 @@ public sealed class AnnuncioFlow : FlowBase<AnnuncioFlow.AnnuncioData>
         public string? Zona { get; set; }
         public string? Descrizione { get; set; }
         public int? Prezzo { get; set; }
-        public List<FotoInfo> FotoLista { get; set; } = [];
+        public List<FotoInfo> FotoLista { get; } = [];
         public string? FotoTmpId { get; set; }
         public string? FotoTmpDesc { get; set; }
         public string? AllegatoId { get; set; }
