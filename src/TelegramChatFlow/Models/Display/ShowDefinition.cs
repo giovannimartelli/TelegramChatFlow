@@ -5,7 +5,7 @@ public sealed class ShowDefinition
 {
     public ShowContentType ContentType { get; init; }
     public Func<FlowContext, Task<string>>? Text { get; init; }
-    public MediaType? Media { get; init; }
+    public ShowMediaType? Media { get; init; }
     public Func<FlowContext, string>? MediaFileId { get; init; }
     public Func<FlowContext, string>? Caption { get; init; }
 }

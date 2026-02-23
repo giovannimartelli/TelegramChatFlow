@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
+using InputMedia = TelegramChatFlow.Models.Input.InputMedia;
 
 namespace TelegramChatFlow.Runtime;
 
@@ -194,15 +195,7 @@ public sealed class FlowEngine
         // Input dell'utente all'interno di un flusso attivo
         if (session.CurrentFlowId is not null)
         {
-            UserInput input;
-
-            if (message.Document is { } doc)
-                input = new UserInput { Document = doc, FileId = doc.FileId };
-            else if (message.WebAppData is { } webApp)
-                input = new UserInput { WebAppData = webApp.Data };
-            else
-                input = new UserInput { Text = message.Text };
-
+            var input = ExtractUserInput(message);
             await ProcessStepInputAsync(session, input);
         }
 
@@ -230,7 +223,7 @@ public sealed class FlowEngine
         var mismatch = step.InputType switch
         {
             InputType.Text when input.Text is null => "Invia un messaggio di testo.",
-            InputType.Document when input.Document is null => "Invia un documento.",
+            InputType.Media when input.Media is null => "Invia un file multimediale.",
             InputType.InlineButtons when input.CallbackData is null => null, // ignora silenziosamente (es. testo su step a bottoni)
             _ => null
         };
@@ -633,6 +626,32 @@ public sealed class FlowEngine
     // ═══════════════════════════════════════════════════════
     //  Helpers
     // ═══════════════════════════════════════════════════════
+
+    private static UserInput ExtractUserInput(Message message)
+    {
+        if (message.Photo is { Length: > 0 } photos)
+        {
+            var photo = photos.OrderByDescending(t=>t.Height * t.Width).First();
+            return new UserInput { Media = new InputMedia(InputMediaType.Photo, photo.FileId, FileSize: photo.FileSize) };
+        }
+        if (message.Video is { } video)
+            return new UserInput { Media = new InputMedia(InputMediaType.Video, video.FileId, video.FileName, video.MimeType, video.FileSize) };
+        if (message.Audio is { } audio)
+            return new UserInput { Media = new InputMedia(InputMediaType.Audio, audio.FileId, audio.FileName, audio.MimeType, audio.FileSize) };
+        if (message.Voice is { } voice)
+            return new UserInput { Media = new InputMedia(InputMediaType.Voice, voice.FileId, MimeType: voice.MimeType, FileSize: voice.FileSize) };
+        if (message.VideoNote is { } videoNote)
+            return new UserInput { Media = new InputMedia(InputMediaType.VideoNote, videoNote.FileId, FileSize: videoNote.FileSize) };
+        if (message.Sticker is { } sticker)
+            return new UserInput { Media = new InputMedia(InputMediaType.Sticker, sticker.FileId) };
+        if (message.Animation is { } animation)
+            return new UserInput { Media = new InputMedia(InputMediaType.Animation, animation.FileId, animation.FileName, animation.MimeType, animation.FileSize) };
+        if (message.Document is { } doc)
+            return new UserInput { Media = new InputMedia(InputMediaType.Document, doc.FileId, doc.FileName, doc.MimeType, doc.FileSize) };
+        if (message.WebAppData is { } webApp)
+            return new UserInput { WebAppData = webApp.Data };
+        return new UserInput { Text = message.Text };
+    }
 
     private bool IsAuthorized(long chatId) =>
         _options.AllowedUsers.Count == 0 || _options.AllowedUsers.Contains(chatId);

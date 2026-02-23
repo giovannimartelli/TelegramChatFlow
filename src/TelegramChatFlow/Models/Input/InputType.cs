@@ -7,7 +7,7 @@ public enum InputType
     None = 0,
     InlineButtons,
     Text,
-    Document,
+    Media,
     WebApp,
     ReplyKeyboard
 }

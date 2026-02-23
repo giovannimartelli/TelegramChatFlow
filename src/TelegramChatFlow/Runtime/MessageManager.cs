@@ -3,6 +3,7 @@ using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
+using InputMedia = Telegram.Bot.Types.InputMedia;
 
 namespace TelegramChatFlow.Runtime;
 
@@ -138,7 +139,7 @@ public sealed class MessageManager
     /// Invia o modifica il messaggio attivo del bot con un media.
     /// </summary>
     public async Task SendOrEditMediaAsync(
-        FlowSession session, MediaType mediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
+        FlowSession session, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
     {
         if (session.BotMessageId.HasValue)
         {
@@ -147,7 +148,7 @@ public sealed class MessageManager
                 await _bot.EditMessageMedia(
                     session.ChatId,
                     session.BotMessageId.Value,
-                    ToInputMedia(mediaType, fileId, caption),
+                    ToInputMedia(showMediaType, fileId, caption),
                     replyMarkup: markup);
                 return;
             }
@@ -163,13 +164,13 @@ public sealed class MessageManager
             }
         }
 
-        await SendNewBotMediaMessageAsync(session, mediaType, fileId, caption, markup);
+        await SendNewBotMediaMessageAsync(session, showMediaType, fileId, caption, markup);
     }
 
     /// <summary>Invia un media aggiuntivo (senza markup) tracciato per la pulizia.</summary>
-    public async Task SendTrackedMediaAsync(FlowSession session, MediaType mediaType, string fileId)
+    public async Task SendTrackedMediaAsync(FlowSession session, ShowMediaType showMediaType, string fileId)
     {
-        var msg = await SendMediaMessageAsync(session.ChatId, mediaType, fileId, caption: null, markup: null);
+        var msg = await SendMediaMessageAsync(session.ChatId, showMediaType, fileId, caption: null, markup: null);
         session.TrackedMessageIds.Add(msg.MessageId);
     }
 
@@ -184,9 +185,9 @@ public sealed class MessageManager
     }
 
     private async Task SendNewBotMediaMessageAsync(
-        FlowSession session, MediaType mediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
+        FlowSession session, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
     {
-        var msg = await SendMediaMessageAsync(session.ChatId, mediaType, fileId, caption, markup);
+        var msg = await SendMediaMessageAsync(session.ChatId, showMediaType, fileId, caption, markup);
 
         if (session.BotMessageId.HasValue)
             await TryDeleteAsync(session.ChatId, session.BotMessageId.Value);
@@ -195,23 +196,23 @@ public sealed class MessageManager
     }
 
     private Task<Message> SendMediaMessageAsync(
-        long chatId, MediaType mediaType, string fileId, string? caption, InlineKeyboardMarkup? markup) =>
-        mediaType switch
+        long chatId, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup) =>
+        showMediaType switch
         {
-            MediaType.Photo     => _bot.SendPhoto(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
-            MediaType.Video     => _bot.SendVideo(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
-            MediaType.Document  => _bot.SendDocument(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
-            MediaType.Animation => _bot.SendAnimation(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
-            _ => throw new ArgumentOutOfRangeException(nameof(mediaType))
+            ShowMediaType.Photo     => _bot.SendPhoto(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            ShowMediaType.Video     => _bot.SendVideo(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            ShowMediaType.Document  => _bot.SendDocument(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            ShowMediaType.Animation => _bot.SendAnimation(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            _ => throw new ArgumentOutOfRangeException(nameof(showMediaType))
         };
 
-    private static InputMedia ToInputMedia(MediaType mediaType, string fileId, string? caption) =>
-        mediaType switch
+    private static InputMedia ToInputMedia(ShowMediaType showMediaType, string fileId, string? caption) =>
+        showMediaType switch
         {
-            MediaType.Photo     => new InputMediaPhoto(InputFile.FromFileId(fileId))     { Caption = caption },
-            MediaType.Video     => new InputMediaVideo(InputFile.FromFileId(fileId))     { Caption = caption },
-            MediaType.Document  => new InputMediaDocument(InputFile.FromFileId(fileId))  { Caption = caption },
-            MediaType.Animation => new InputMediaAnimation(InputFile.FromFileId(fileId)) { Caption = caption },
-            _ => throw new ArgumentOutOfRangeException(nameof(mediaType))
+            ShowMediaType.Photo     => new InputMediaPhoto(InputFile.FromFileId(fileId))     { Caption = caption },
+            ShowMediaType.Video     => new InputMediaVideo(InputFile.FromFileId(fileId))     { Caption = caption },
+            ShowMediaType.Document  => new InputMediaDocument(InputFile.FromFileId(fileId))  { Caption = caption },
+            ShowMediaType.Animation => new InputMediaAnimation(InputFile.FromFileId(fileId)) { Caption = caption },
+            _ => throw new ArgumentOutOfRangeException(nameof(showMediaType))
         };
 }

@@ -1,4 +1,5 @@
 using TelegramChatFlow.Builder.Input;
+using TelegramChatFlow.Builder.Show;
 
 namespace TelegramChatFlow.Builder.Step;
 
@@ -39,9 +40,9 @@ public sealed class StepBuilder
     /// Configura il tipo di input atteso dallo step.
     /// Se omesso, lo step è display-only.
     /// </summary>
-    public StepBuilder Input(Action<InputConfigurator> configure)
+    public StepBuilder Input(Action<InputTypeConfigurator> configure)
     {
-        configure(new InputConfigurator(this));
+        configure(new InputTypeConfigurator(this));
         return this;
     }
 
