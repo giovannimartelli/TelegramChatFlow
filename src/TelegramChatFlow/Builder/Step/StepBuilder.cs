@@ -15,6 +15,8 @@ public sealed class StepBuilder
     private Func<FlowContext, UserInput, Task<StepResult>> _handler = (_, _) => Task.FromResult(StepResult.Exit);
     private bool _skippable;
     private bool _persistent;
+    private bool _showBack = true;
+    private bool _showMenu = true;
     private int _ordinal;
 
     internal StepBuilder(string id, int defaultOrdinal)
@@ -64,6 +66,20 @@ public sealed class StepBuilder
         return this;
     }
 
+    /// <summary>Nasconde il bottone "Indietro" per questo step.</summary>
+    public StepBuilder HideBack()
+    {
+        _showBack = false;
+        return this;
+    }
+
+    /// <summary>Nasconde il bottone "Menu" per questo step.</summary>
+    public StepBuilder HideMenu()
+    {
+        _showMenu = false;
+        return this;
+    }
+
     /// <summary>Imposta l'ordinale di esecuzione dello step (default: indice × 10).</summary>
     public StepBuilder WithOrdinal(int ordinal)
     {
@@ -92,6 +108,8 @@ public sealed class StepBuilder
         HandleInput = _handler,
         Skippable = _skippable,
         Persistent = _persistent,
+        ShowBack = _showBack,
+        ShowMenu = _showMenu,
         Ordinal = _ordinal
     };
 }

@@ -610,12 +610,12 @@ public sealed class FlowEngine
     {
         var nav = new List<InlineKeyboardButton>();
 
-        // "Indietro" appare solo se c'è qualcosa a cui tornare (history o stack)
         bool canGoBack = session.StepHistory.Count > 0 || session.FlowStack.Count > 0;
-        if (canGoBack)
+        if (canGoBack && step?.ShowBack != false)
             nav.Add(InlineKeyboardButton.WithCallbackData("◀️ Indietro", "nav:back"));
 
-        nav.Add(InlineKeyboardButton.WithCallbackData("🏠 Menu", "nav:menu"));
+        if (step?.ShowMenu != false)
+            nav.Add(InlineKeyboardButton.WithCallbackData("🏠 Menu", "nav:menu"));
 
         if (step?.Skippable == true)
             nav.Add(InlineKeyboardButton.WithCallbackData("⏭ Salta", "nav:skip"));

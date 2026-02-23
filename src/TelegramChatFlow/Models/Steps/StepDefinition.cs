@@ -12,5 +12,7 @@ public sealed class StepDefinition
     public required Func<FlowContext, UserInput, Task<StepResult>> HandleInput { get; init; }
     public bool Skippable { get; init; }
     public bool Persistent { get; init; }
+    public bool ShowBack { get; init; } = true;
+    public bool ShowMenu { get; init; } = true;
     public int Ordinal { get; init; }
 }
