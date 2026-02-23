@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace TelegramChatFlow.Runtime;
@@ -133,6 +134,45 @@ public sealed class MessageManager
         session.BotMessageId = null;
     }
 
+    /// <summary>
+    /// Invia o modifica il messaggio attivo del bot con un media.
+    /// </summary>
+    public async Task SendOrEditMediaAsync(
+        FlowSession session, MediaType mediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
+    {
+        if (session.BotMessageId.HasValue)
+        {
+            try
+            {
+                await _bot.EditMessageMedia(
+                    session.ChatId,
+                    session.BotMessageId.Value,
+                    ToInputMedia(mediaType, fileId, caption),
+                    replyMarkup: markup);
+                return;
+            }
+            catch (ApiRequestException ex) when (ex.Message.Contains("message is not modified"))
+            {
+                return;
+            }
+            catch (ApiRequestException ex)
+            {
+                _logger.LogWarning(ex,
+                    "Impossibile editare media {MsgId} per chat {ChatId}, ne invio uno nuovo",
+                    session.BotMessageId, session.ChatId);
+            }
+        }
+
+        await SendNewBotMediaMessageAsync(session, mediaType, fileId, caption, markup);
+    }
+
+    /// <summary>Invia un media aggiuntivo (senza markup) tracciato per la pulizia.</summary>
+    public async Task SendTrackedMediaAsync(FlowSession session, MediaType mediaType, string fileId)
+    {
+        var msg = await SendMediaMessageAsync(session.ChatId, mediaType, fileId, caption: null, markup: null);
+        session.TrackedMessageIds.Add(msg.MessageId);
+    }
+
     private async Task SendNewBotMessageAsync(FlowSession session, string text, InlineKeyboardMarkup? markup)
     {
         var msg = await _bot.SendMessage(session.ChatId, text, replyMarkup: markup);
@@ -142,4 +182,36 @@ public sealed class MessageManager
 
         session.BotMessageId = msg.MessageId;
     }
+
+    private async Task SendNewBotMediaMessageAsync(
+        FlowSession session, MediaType mediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
+    {
+        var msg = await SendMediaMessageAsync(session.ChatId, mediaType, fileId, caption, markup);
+
+        if (session.BotMessageId.HasValue)
+            await TryDeleteAsync(session.ChatId, session.BotMessageId.Value);
+
+        session.BotMessageId = msg.MessageId;
+    }
+
+    private Task<Message> SendMediaMessageAsync(
+        long chatId, MediaType mediaType, string fileId, string? caption, InlineKeyboardMarkup? markup) =>
+        mediaType switch
+        {
+            MediaType.Photo     => _bot.SendPhoto(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            MediaType.Video     => _bot.SendVideo(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            MediaType.Document  => _bot.SendDocument(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            MediaType.Animation => _bot.SendAnimation(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            _ => throw new ArgumentOutOfRangeException(nameof(mediaType))
+        };
+
+    private static InputMedia ToInputMedia(MediaType mediaType, string fileId, string? caption) =>
+        mediaType switch
+        {
+            MediaType.Photo     => new InputMediaPhoto(InputFile.FromFileId(fileId))     { Caption = caption },
+            MediaType.Video     => new InputMediaVideo(InputFile.FromFileId(fileId))     { Caption = caption },
+            MediaType.Document  => new InputMediaDocument(InputFile.FromFileId(fileId))  { Caption = caption },
+            MediaType.Animation => new InputMediaAnimation(InputFile.FromFileId(fileId)) { Caption = caption },
+            _ => throw new ArgumentOutOfRangeException(nameof(mediaType))
+        };
 }

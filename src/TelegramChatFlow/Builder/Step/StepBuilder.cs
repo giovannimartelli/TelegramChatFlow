@@ -8,9 +8,9 @@ public sealed class StepBuilder
     private readonly string _id;
     private ShowDefinition _show = new() { ContentType = ShowContentType.Text, Text = _ => Task.FromResult("") };
     private InputType _inputType = InputType.None;
-    private Func<FlowContext, IReadOnlyList<InlineButton>>? _buttonsProvider;
-    private Func<FlowContext, IReadOnlyList<string>>? _replyKeyboardProvider;
-    private Func<FlowContext, string>? _webAppUrlProvider;
+    private Func<FlowContext, Task<IReadOnlyList<InlineButton>>>? _buttonsProvider;
+    private Func<FlowContext, Task<IReadOnlyList<string>>>? _replyKeyboardProvider;
+    private Func<FlowContext, Task<string>>? _webAppUrlProvider;
     private Func<FlowContext, UserInput, Task<StepResult>> _handler = (_, _) => Task.FromResult(StepResult.Exit);
     private bool _skippable;
     private bool _persistent;
@@ -73,9 +73,9 @@ public sealed class StepBuilder
     // ── Setter interni (usati da InputConfigurator) ──
 
     internal void SetInputType(InputType type) => _inputType = type;
-    internal void SetButtonsProvider(Func<FlowContext, IReadOnlyList<InlineButton>> provider) => _buttonsProvider = provider;
-    internal void SetReplyKeyboardProvider(Func<FlowContext, IReadOnlyList<string>> provider) => _replyKeyboardProvider = provider;
-    internal void SetWebAppUrlProvider(Func<FlowContext, string> provider) => _webAppUrlProvider = provider;
+    internal void SetButtonsProvider(Func<FlowContext, Task<IReadOnlyList<InlineButton>>> provider) => _buttonsProvider = provider;
+    internal void SetReplyKeyboardProvider(Func<FlowContext, Task<IReadOnlyList<string>>> provider) => _replyKeyboardProvider = provider;
+    internal void SetWebAppUrlProvider(Func<FlowContext, Task<string>> provider) => _webAppUrlProvider = provider;
     internal void SetHandler(Func<FlowContext, UserInput, Task<StepResult>> handler) => _handler = handler;
 
     // ── Build ──────────────────────────────────────────

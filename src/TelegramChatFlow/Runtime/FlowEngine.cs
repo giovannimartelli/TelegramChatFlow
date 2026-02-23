@@ -223,6 +223,9 @@ public sealed class FlowEngine
 
         var step = flow.Steps[session.CurrentStepIndex];
 
+        // Step display-only: nessun input da elaborare
+        if (step.InputType == InputType.None) return;
+
         // Valida che il tipo di input corrisponda a quello atteso dallo step
         var mismatch = step.InputType switch
         {
@@ -234,13 +237,16 @@ public sealed class FlowEngine
 
         if (mismatch is not null)
         {
-            await RenderStepAsync(session, flow, step, mismatch);
+            await RenderStepAsync(session, step, mismatch);
             return;
         }
 
         // Ignora messaggi di testo su step che aspettano bottoni inline (nessun feedback)
         if (step.InputType == InputType.InlineButtons && input.CallbackData is null)
             return;
+
+        // Snapshot dei dati prima che l'handler li modifichi (per il back)
+        var dataSnapshot = new Dictionary<string, object?>(session.Data);
 
         var context = new FlowContext { Data = session.Data };
 
@@ -261,13 +267,19 @@ public sealed class FlowEngine
 
         switch (result)
         {
-            case StepResult.Next:
-                await AdvanceAsync(session, flow);
+            case StepResult.NextResult:
+                await AdvanceAsync(session, flow, dataSnapshot);
                 break;
-            case StepResult.Retry:
-                await RenderStepAsync(session, flow, step, context.ValidationError);
+            case StepResult.RetryResult { Show: { } retryShow }:
+                await RenderStepAsync(session, step, context.ValidationError, retryShow);
                 break;
-            case StepResult.Exit:
+            case StepResult.RetryResult:
+                await RenderStepAsync(session, step, context.ValidationError);
+                break;
+            case StepResult.GoToResult { StepId: var targetId }:
+                await GoToStepAsync(session, flow, targetId, dataSnapshot);
+                break;
+            case StepResult.ExitResult:
                 await ResetToMenuAsync(session);
                 break;
         }
@@ -277,19 +289,25 @@ public sealed class FlowEngine
     //  Navigazione
     // ═══════════════════════════════════════════════════════
 
-    private async Task AdvanceAsync(FlowSession session, FlowDefinition flow)
+    private async Task AdvanceAsync(FlowSession session, FlowDefinition flow,
+        Dictionary<string, object?>? dataSnapshot = null)
     {
         // Se lo step corrente è persistente, stacca il messaggio (resta visibile senza keyboard)
         var currentStep = flow.Steps.ElementAtOrDefault(session.CurrentStepIndex);
         if (currentStep?.Persistent == true)
             await _messages.DetachBotMessageAsync(session);
 
+        session.StepHistory.Push(new StepHistoryEntry
+        {
+            StepIndex = session.CurrentStepIndex,
+            Data = dataSnapshot ?? new Dictionary<string, object?>(session.Data)
+        });
         var next = session.CurrentStepIndex + 1;
 
         if (next < flow.Steps.Count)
         {
             session.CurrentStepIndex = next;
-            await RenderStepAsync(session, flow, flow.Steps[next]);
+            await RenderStepAsync(session, flow.Steps[next]);
         }
         else if (flow.SubFlows is { Count: > 0 })
         {
@@ -310,21 +328,23 @@ public sealed class FlowEngine
         // Tornando indietro, cancella eventuali messaggi persistenti accumulati
         await _messages.CleanupPersistentMessagesAsync(session);
 
-        if (session.CurrentStepIndex > 0)
+        if (session.StepHistory.TryPop(out var entry))
         {
             var flow = _allFlows.GetValueOrDefault(session.CurrentFlowId);
             if (flow is null) { await ResetToMenuAsync(session); return; }
 
-            session.CurrentStepIndex--;
-            await RenderStepAsync(session, flow, flow.Steps[session.CurrentStepIndex]);
+            session.CurrentStepIndex = entry.StepIndex;
+            session.Data = entry.Data;
+            await RenderStepAsync(session, flow.Steps[entry.StepIndex]);
         }
         else if (session.FlowStack.Count > 0)
         {
-            // Primo step di un sub-flow → torna al genitore
+            // Nessuna history nel sub-flow corrente → torna al flusso genitore
             var frame = session.FlowStack.Pop();
-            session.CurrentFlowId = frame.FlowId;
+            session.CurrentFlowId    = frame.FlowId;
             session.CurrentStepIndex = frame.StepIndex;
-            session.Data = frame.Data;
+            session.Data             = frame.Data;
+            session.StepHistory      = frame.StepHistory;
 
             var parent = _allFlows.GetValueOrDefault(frame.FlowId);
             if (parent?.SubFlows is { Count: > 0 })
@@ -334,9 +354,27 @@ public sealed class FlowEngine
         }
         else
         {
-            // Primo step di un flusso root → torna al menu
+            // Nessuna history e nessuno stack → torna al menu
             await ResetToMenuAsync(session);
         }
+    }
+
+    private async Task GoToStepAsync(FlowSession session, FlowDefinition flow, string stepId,
+        Dictionary<string, object?> dataSnapshot)
+    {
+        var targetIdx = -1;
+        for (var i = 0; i < flow.Steps.Count; i++)
+            if (flow.Steps[i].Id == stepId) { targetIdx = i; break; }
+
+        if (targetIdx < 0) { await ResetToMenuAsync(session); return; }
+
+        session.StepHistory.Push(new StepHistoryEntry
+        {
+            StepIndex = session.CurrentStepIndex,
+            Data = dataSnapshot
+        });
+        session.CurrentStepIndex = targetIdx;
+        await RenderStepAsync(session, flow.Steps[targetIdx]);
     }
 
     private async Task SkipStepAsync(FlowSession session)
@@ -348,7 +386,7 @@ public sealed class FlowEngine
 
         var step = flow.Steps.ElementAtOrDefault(session.CurrentStepIndex);
         if (step?.Skippable == true)
-            await AdvanceAsync(session, flow);
+            await AdvanceAsync(session, flow, new Dictionary<string, object?>(session.Data));
     }
 
     private async Task StartFlowAsync(FlowSession session, string flowId)
@@ -359,9 +397,10 @@ public sealed class FlowEngine
         session.CurrentStepIndex = 0;
         session.Data = new();
         session.FlowStack = new();
+        session.StepHistory = new();
 
         if (flow.Steps.Count > 0)
-            await RenderStepAsync(session, flow, flow.Steps[0]);
+            await RenderStepAsync(session, flow.Steps[0]);
         else if (flow.SubFlows is { Count: > 0 })
             await ShowSubFlowMenuAsync(session, flow);
     }
@@ -375,17 +414,19 @@ public sealed class FlowEngine
         // Salva il frame corrente nello stack
         session.FlowStack.Push(new SubFlowFrame
         {
-            FlowId = session.CurrentFlowId!,
-            StepIndex = session.CurrentStepIndex,
-            Data = new Dictionary<string, object?>(session.Data)
+            FlowId      = session.CurrentFlowId!,
+            StepIndex   = session.CurrentStepIndex,
+            Data        = new Dictionary<string, object?>(session.Data),
+            StepHistory = session.StepHistory
         });
 
         session.CurrentFlowId = subFlowId;
         session.CurrentStepIndex = 0;
         session.Data = new();
+        session.StepHistory = new();
 
         if (sub.Steps.Count > 0)
-            await RenderStepAsync(session, sub, sub.Steps[0]);
+            await RenderStepAsync(session, sub.Steps[0]);
         else if (sub.SubFlows is { Count: > 0 })
             await ShowSubFlowMenuAsync(session, sub);
     }
@@ -399,6 +440,7 @@ public sealed class FlowEngine
             session.CurrentFlowId = frame.FlowId;
             session.CurrentStepIndex = frame.StepIndex;
             session.Data = frame.Data;
+            session.StepHistory = frame.StepHistory;
 
             var parent = _allFlows.GetValueOrDefault(frame.FlowId);
             if (parent?.SubFlows is { Count: > 0 })
@@ -419,7 +461,8 @@ public sealed class FlowEngine
     // ═══════════════════════════════════════════════════════
 
     private async Task RenderStepAsync(
-        FlowSession session, FlowDefinition flow, StepDefinition step, string? error = null)
+        FlowSession session, StepDefinition step, string? error = null,
+        ShowDefinition? showOverride = null)
     {
         // Pulizia messaggi extra (es. reply keyboard) dello step precedente
         await _messages.CleanupTransientMessagesAsync(session);
@@ -431,28 +474,57 @@ public sealed class FlowEngine
         }
 
         var ctx = new FlowContext { Data = session.Data };
-        var text = await step.RenderText(ctx);
+        var show = showOverride ?? step.Show;
 
-        if (error is not null)
-            text += $"\n\n⚠️ {error}";
-
-        if (step.InputType == InputType.ReplyKeyboard && step.ReplyKeyboardProvider is not null)
+        switch (show.ContentType)
         {
-            // Reply keyboard: messaggio editato con bottoni di navigazione inline
-            // + messaggio aggiuntivo con la reply keyboard
-            var nav = BuildNavigationKeyboard(session, step);
-            await _messages.SendOrEditAsync(session, text, nav);
+            case ShowContentType.Text:
+            {
+                var text = await show.Text!(ctx);
+                if (error is not null) text += $"\n\n⚠️ {error}";
 
-            var buttons = step.ReplyKeyboardProvider(ctx);
-            var rows = buttons.Select(b => new[] { new KeyboardButton(b) });
-            var replyMarkup = new ReplyKeyboardMarkup(rows) { ResizeKeyboard = true, OneTimeKeyboard = true };
-            await _messages.SendReplyKeyboardAsync(session, "👇", replyMarkup);
-            session.HasReplyKeyboard = true;
-        }
-        else
-        {
-            var markup = BuildStepKeyboard(session, step, ctx);
-            await _messages.SendOrEditAsync(session, text, markup);
+                if (step.InputType == InputType.ReplyKeyboard && step.ReplyKeyboardProvider is not null)
+                {
+                    // Reply keyboard: messaggio editato con bottoni di navigazione inline
+                    // + messaggio aggiuntivo con la reply keyboard
+                    var nav = BuildNavigationKeyboard(session, step);
+                    await _messages.SendOrEditAsync(session, text, nav);
+
+                    var buttons = await step.ReplyKeyboardProvider(ctx);
+                    var rows = buttons.Select(b => new[] { new KeyboardButton(b) });
+                    var replyMarkup = new ReplyKeyboardMarkup(rows) { ResizeKeyboard = true, OneTimeKeyboard = true };
+                    await _messages.SendReplyKeyboardAsync(session, "👇", replyMarkup);
+                    session.HasReplyKeyboard = true;
+                }
+                else
+                {
+                    var markup = await BuildStepKeyboardAsync(session, step, ctx);
+                    await _messages.SendOrEditAsync(session, text, markup);
+                }
+                break;
+            }
+
+            case ShowContentType.Media:
+            {
+                var fileId = show.MediaFileId!(ctx);
+                var caption = show.Caption?.Invoke(ctx);
+                if (error is not null) caption = (caption is null ? "" : caption + "\n\n") + $"⚠️ {error}";
+                var markup = await BuildStepKeyboardAsync(session, step, ctx);
+                await _messages.SendOrEditMediaAsync(session, show.Media!.Value, fileId, caption, markup);
+                break;
+            }
+
+            case ShowContentType.TextWithMedia:
+            {
+                var text = await show.Text!(ctx);
+                if (error is not null) text += $"\n\n⚠️ {error}";
+                var markup = await BuildStepKeyboardAsync(session, step, ctx);
+                await _messages.SendOrEditAsync(session, text, markup);
+
+                var fileId = show.MediaFileId!(ctx);
+                await _messages.SendTrackedMediaAsync(session, show.Media!.Value, fileId);
+                break;
+            }
         }
     }
 
@@ -507,6 +579,7 @@ public sealed class FlowEngine
         session.CurrentStepIndex = 0;
         session.Data = new();
         session.FlowStack = new();
+        session.StepHistory = new();
 
         await ShowMenuAsync(session);
     }
@@ -515,19 +588,19 @@ public sealed class FlowEngine
     //  Costruzione tastiere
     // ═══════════════════════════════════════════════════════
 
-    private InlineKeyboardMarkup BuildStepKeyboard(
+    private async Task<InlineKeyboardMarkup> BuildStepKeyboardAsync(
         FlowSession session, StepDefinition step, FlowContext ctx)
     {
         var rows = new List<List<InlineKeyboardButton>>();
 
         if (step.InputType == InputType.InlineButtons && step.ButtonsProvider is not null)
         {
-            foreach (var btn in step.ButtonsProvider(ctx))
+            foreach (var btn in await step.ButtonsProvider(ctx))
                 rows.Add([InlineKeyboardButton.WithCallbackData(btn.Text, btn.CallbackData)]);
         }
         else if (step.InputType == InputType.WebApp && step.WebAppUrlProvider is not null)
         {
-            var url = step.WebAppUrlProvider(ctx);
+            var url = await step.WebAppUrlProvider(ctx);
             rows.Add([InlineKeyboardButton.WithWebApp("🌐 Apri", new WebAppInfo { Url = url })]);
         }
 
@@ -544,9 +617,9 @@ public sealed class FlowEngine
     {
         var nav = new List<InlineKeyboardButton>();
 
-        // "Indietro" non appare al primo step di un flusso root
-        bool isFirstOfRoot = session.CurrentStepIndex == 0 && session.FlowStack.Count == 0;
-        if (!isFirstOfRoot)
+        // "Indietro" appare solo se c'è qualcosa a cui tornare (history o stack)
+        bool canGoBack = session.StepHistory.Count > 0 || session.FlowStack.Count > 0;
+        if (canGoBack)
             nav.Add(InlineKeyboardButton.WithCallbackData("◀️ Indietro", "nav:back"));
 
         nav.Add(InlineKeyboardButton.WithCallbackData("🏠 Menu", "nav:menu"));
@@ -570,6 +643,7 @@ public sealed class FlowEngine
         session.CurrentStepIndex = 0;
         session.Data = new();
         session.FlowStack = new();
+        session.StepHistory = new();
         session.TrackedMessageIds.Clear();
         session.PersistentMessageIds.Clear();
         session.HasReplyKeyboard = false;

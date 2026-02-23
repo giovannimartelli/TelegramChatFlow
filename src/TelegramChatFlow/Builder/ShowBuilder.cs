@@ -62,6 +62,16 @@ public sealed class ShowBuilder
         return this;
     }
 
+    // ── Factory ─────────────────────────────────────────────
+
+    /// <summary>Crea una <see cref="ShowDefinition"/> inline tramite il builder.</summary>
+    public static ShowDefinition Create(Action<ShowBuilder> configure)
+    {
+        var builder = new ShowBuilder();
+        configure(builder);
+        return builder.Build();
+    }
+
     // ── Build ─────────────────────────────────────────────
 
     internal ShowDefinition Build()

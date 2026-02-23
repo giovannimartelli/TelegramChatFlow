@@ -13,6 +13,14 @@ public sealed class FlowSession
     public bool HasReplyKeyboard { get; set; }
     public DateTime LastActivity { get; set; } = DateTime.UtcNow;
     public Stack<SubFlowFrame> FlowStack { get; set; } = new();
+    public Stack<StepHistoryEntry> StepHistory { get; set; } = new();
+}
+
+/// <summary>Entry nello stack di navigazione: indice dello step + snapshot dei dati prima della transizione.</summary>
+public sealed class StepHistoryEntry
+{
+    public required int StepIndex { get; init; }
+    public required Dictionary<string, object?> Data { get; init; }
 }
 
 /// <summary>Frame salvato nello stack quando si entra in un sub-flow.</summary>
@@ -21,6 +29,7 @@ public sealed class SubFlowFrame
     public required string FlowId { get; init; }
     public required int StepIndex { get; init; }
     public required Dictionary<string, object?> Data { get; init; }
+    public required Stack<StepHistoryEntry> StepHistory { get; init; }
 }
 
 /// <summary>Interfaccia per la persistenza delle sessioni.</summary>
