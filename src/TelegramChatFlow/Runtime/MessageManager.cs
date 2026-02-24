@@ -107,7 +107,7 @@ public sealed class MessageManager
     /// </summary>
     public async Task DetachBotMessageAsync(FlowSession session)
     {
-        if (!session.BotMessageId.HasValue) return;
+        if (session.BotMessageId == null) return;
 
         // Rimuovi la inline keyboard dal messaggio staccato
         try
@@ -115,7 +115,7 @@ public sealed class MessageManager
             await _bot.EditMessageReplyMarkup(
                 session.ChatId,
                 session.BotMessageId.Value,
-                replyMarkup: new InlineKeyboardMarkup(Array.Empty<InlineKeyboardButton[]>()));
+                replyMarkup: null);
         }
         catch (ApiRequestException) { /* messaggio potrebbe non essere più editabile */ }
 

@@ -59,10 +59,6 @@ public sealed class FlowEngine
             try
             {
                 await CleanupSessionAsync(session);
-
-                if (session.BotMessageId.HasValue)
-                    await _renderer.ShowMenuAsync(session);
-
                 await _store.SaveAsync(session);
             }
             catch (Exception ex)
@@ -76,7 +72,7 @@ public sealed class FlowEngine
     public async Task HandleUpdateAsync(Update update)
     {
         var chatId = update.CallbackQuery?.Message?.Chat.Id
-                  ?? update.Message?.Chat.Id;
+                     ?? update.Message?.Chat.Id;
 
         if (chatId is null) return;
         if (!IsAuthorized(chatId.Value)) return;
@@ -86,7 +82,7 @@ public sealed class FlowEngine
         try
         {
             var session = await _store.GetAsync(chatId.Value)
-                       ?? new FlowSession { ChatId = chatId.Value };
+                          ?? new FlowSession { ChatId = chatId.Value };
             session.LastActivity = DateTime.UtcNow;
 
             if (update.CallbackQuery is { } callback)
@@ -115,7 +111,7 @@ public sealed class FlowEngine
         {
             var cutoff = DateTime.UtcNow - _options.InactivityTimeout;
             var fresh = await _store.GetAsync(session.ChatId);
-            if (fresh?.CurrentFlowId is null || session.LastActivity >= cutoff) return;
+            if (fresh == null || session.LastActivity >= cutoff) return;
 
             await _navigator.ResetToMenuAsync(fresh);
             await _store.SaveAsync(fresh);
@@ -136,24 +132,36 @@ public sealed class FlowEngine
 
     private async Task HandleCallbackAsync(FlowSession session, CallbackQuery callback)
     {
-        try { await _bot.AnswerCallbackQuery(callback.Id); }
-        catch { /* non-fatale: il callback potrebbe essere scaduto o già risposto */ }
+        try
+        {
+            await _bot.AnswerCallbackQuery(callback.Id);
+        }
+        catch
+        {
+            /* non-fatale: il callback potrebbe essere scaduto o già risposto */
+        }
 
         if (callback.Message?.MessageId != session.BotMessageId)
         {
-            if (session.BotMessageId is null)
-                await _navigator.ResetToMenuAsync(session);
-            return;
+            await _navigator.ResetToMenuAsync(session);
         }
 
         var data = callback.Data ?? "";
 
         switch (data)
         {
-            case "nav:back":    await _navigator.GoBackAsync(session); return;
-            case "nav:menu":    await _navigator.ResetToMenuAsync(session); return;
-            case "nav:skip":    await _navigator.SkipStepAsync(session); return;
-            case "nav:subdone": await _navigator.CompleteCurrentFlowAsync(session); return;
+            case "nav:back":
+                await _navigator.GoBackAsync(session);
+                return;
+            case "nav:menu":
+                await _navigator.ResetToMenuAsync(session);
+                return;
+            case "nav:skip":
+                await _navigator.SkipStepAsync(session);
+                return;
+            case "nav:subdone":
+                await _navigator.CompleteCurrentFlowAsync(session);
+                return;
         }
 
         if (data.StartsWith("flow:"))
