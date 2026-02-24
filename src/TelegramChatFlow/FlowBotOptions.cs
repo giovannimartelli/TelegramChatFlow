@@ -1,22 +1,22 @@
 namespace TelegramChatFlow;
 
-/// <summary>Opzioni di configurazione del bot.</summary>
+/// <summary>Bot configuration options.</summary>
 public sealed class FlowBotOptions
 {
-    /// <summary>Token del bot Telegram.</summary>
+    /// <summary>Telegram bot token.</summary>
     public required string BotToken { get; set; }
 
     /// <summary>
-    /// ID degli utenti autorizzati. Se vuoto, tutti possono usare il bot.
+    /// Authorized user IDs. If empty, all users can use the bot.
     /// </summary>
     public HashSet<long> AllowedUsers { get; set; } = [];
 
-    /// <summary>Timeout di inattività prima del reset automatico.</summary>
+    /// <summary>Inactivity timeout before automatic reset.</summary>
     public TimeSpan InactivityTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
-    /// <summary>Intervallo di controllo del watchdog.</summary>
+    /// <summary>Watchdog check interval.</summary>
     public TimeSpan WatchdogInterval { get; set; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>Testo del menu principale.</summary>
-    public string MainMenuText { get; set; } = "📋 Menu Principale\n\nSeleziona un'opzione:";
+    /// <summary>Main menu text.</summary>
+    public string MainMenuText { get; set; } = "📋 Main Menu\n\nSelect an option:";
 }

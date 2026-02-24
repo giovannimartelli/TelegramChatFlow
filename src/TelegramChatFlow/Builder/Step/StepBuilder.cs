@@ -3,7 +3,7 @@ using TelegramChatFlow.Builder.Show;
 
 namespace TelegramChatFlow.Builder.Step;
 
-/// <summary>Builder fluent per la definizione di uno step tipizzato.</summary>
+/// <summary>Fluent builder for defining a typed step.</summary>
 public sealed class StepBuilder<TData> where TData : class, new()
 {
     private readonly string _id;
@@ -27,7 +27,7 @@ public sealed class StepBuilder<TData> where TData : class, new()
 
     // ── Display ────────────────────────────────────────
 
-    /// <summary>Configura il contenuto visivo dello step.</summary>
+    /// <summary>Configures the visual content of the step.</summary>
     public StepBuilder<TData> Show(Action<ShowBuilder<TData>> configure)
     {
         var builder = new ShowBuilder<TData>();
@@ -39,8 +39,8 @@ public sealed class StepBuilder<TData> where TData : class, new()
     // ── Input ──────────────────────────────────────────
 
     /// <summary>
-    /// Configura il tipo di input atteso dallo step.
-    /// Se omesso, lo step è display-only.
+    /// Configures the expected input type for the step.
+    /// If omitted, the step is display-only.
     /// </summary>
     public StepBuilder<TData> Input(Action<InputTypeConfigurator<TData>> configure)
     {
@@ -57,8 +57,8 @@ public sealed class StepBuilder<TData> where TData : class, new()
     }
 
     /// <summary>
-    /// Il messaggio dello step resta visibile nella chat dopo l'avanzamento.
-    /// Viene rimosso solo al ritorno al menu principale o per timeout.
+    /// The step message remains visible in the chat after advancing.
+    /// It is removed only when returning to the main menu or on timeout.
     /// </summary>
     public StepBuilder<TData> Persistent()
     {
@@ -66,28 +66,28 @@ public sealed class StepBuilder<TData> where TData : class, new()
         return this;
     }
 
-    /// <summary>Nasconde il bottone "Indietro" per questo step.</summary>
+    /// <summary>Hides the "Back" button for this step.</summary>
     public StepBuilder<TData> HideBack()
     {
         _showBack = false;
         return this;
     }
 
-    /// <summary>Nasconde il bottone "Menu" per questo step.</summary>
+    /// <summary>Hides the "Menu" button for this step.</summary>
     public StepBuilder<TData> HideMenu()
     {
         _showMenu = false;
         return this;
     }
 
-    /// <summary>Imposta l'ordinale di esecuzione dello step (default: indice × 10).</summary>
+    /// <summary>Sets the execution ordinal of the step (default: index × 10).</summary>
     public StepBuilder<TData> WithOrdinal(int ordinal)
     {
         _ordinal = ordinal;
         return this;
     }
 
-    // ── Setter interni (usati da InputConfigurator) ──
+    // ── Internal setters (used by InputConfigurator) ──
 
     internal void SetInputType(InputType type) => _inputType = type;
     internal void SetButtonsProvider(Func<FlowContext, Task<IReadOnlyList<InlineButton>>> provider) => _buttonsProvider = provider;

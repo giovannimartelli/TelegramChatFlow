@@ -5,8 +5,8 @@ using Telegram.Bot.Types.ReplyMarkups;
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// Rendering degli step e menu principale.
-/// Costruisce anche le tastiere inline e di navigazione.
+/// Step and main menu rendering.
+/// Also builds inline and navigation keyboards.
 /// </summary>
 public sealed class StepRenderer
 {
@@ -24,7 +24,7 @@ public sealed class StepRenderer
         _registry = registry;
     }
 
-    /// <summary>Renderizza uno step: testo/media + tastiera inline.</summary>
+    /// <summary>Renders a step: text/media + inline keyboard.</summary>
     public async Task RenderStepAsync(
         FlowSession session, StepDefinition step, string? error = null,
         ShowDefinition? showOverride = null)
@@ -91,7 +91,7 @@ public sealed class StepRenderer
         }
     }
 
-    /// <summary>Mostra il menu principale con tutti i flussi root.</summary>
+    /// <summary>Shows the main menu with all root flows.</summary>
     public async Task ShowMenuAsync(FlowSession session)
     {
         var rows = _registry.RootFlows
@@ -117,7 +117,7 @@ public sealed class StepRenderer
         else if (step.InputType == InputType.WebApp && step.WebAppUrlProvider is not null)
         {
             var url = await step.WebAppUrlProvider(ctx);
-            rows.Add([InlineKeyboardButton.WithWebApp("🌐 Apri", new WebAppInfo { Url = url })]);
+            rows.Add([InlineKeyboardButton.WithWebApp("🌐 Open", new WebAppInfo { Url = url })]);
         }
 
         rows.Add(BuildNavigationRow(session, step));
@@ -130,13 +130,13 @@ public sealed class StepRenderer
 
         bool canGoBack = session.StepHistory.Count > 0 || session.FlowStack.Count > 0;
         if (canGoBack && step?.ShowBack != false)
-            nav.Add(InlineKeyboardButton.WithCallbackData("◀️ Indietro", "nav:back"));
+            nav.Add(InlineKeyboardButton.WithCallbackData("◀️ Back", "nav:back"));
 
         if (step?.ShowMenu != false)
             nav.Add(InlineKeyboardButton.WithCallbackData("🏠 Menu", "nav:menu"));
 
         if (step?.Skippable == true)
-            nav.Add(InlineKeyboardButton.WithCallbackData("⏭ Salta", "nav:skip"));
+            nav.Add(InlineKeyboardButton.WithCallbackData("⏭ Skip", "nav:skip"));
 
         return nav;
     }

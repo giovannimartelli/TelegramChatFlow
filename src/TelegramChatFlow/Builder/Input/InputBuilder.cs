@@ -3,9 +3,9 @@ using TelegramChatFlow.Builder.Step;
 namespace TelegramChatFlow.Builder.Input;
 
 /// <summary>
-/// Builder tipizzato per la configurazione dell'handler di input di uno step.
-/// <typeparamref name="TInput"/> è il tipo estratto da <see cref="UserInput"/> in base al tipo di input dichiarato.
-/// <typeparamref name="TData"/> è il tipo dati del flusso.
+/// Typed builder for configuring the input handler of a step.
+/// <typeparamref name="TInput"/> is the type extracted from <see cref="UserInput"/> based on the declared input type.
+/// <typeparamref name="TData"/> is the flow's data type.
 /// </summary>
 public sealed class InputBuilder<TInput, TData> where TData : class, new()
 {
@@ -18,21 +18,21 @@ public sealed class InputBuilder<TInput, TData> where TData : class, new()
         _extractor = extractor;
     }
 
-    /// <summary>Handler con risultato asincrono completo.</summary>
+    /// <summary>Handler with full async result.</summary>
     public InputBuilder<TInput, TData> OnInput(Func<FlowContext<TData>, TInput, Task<StepResult>> handler)
     {
         _parent.SetHandler((ctx, input) => handler((FlowContext<TData>)ctx, _extractor(input)));
         return this;
     }
 
-    /// <summary>Handler sincrono con <see cref="StepResult"/>.</summary>
+    /// <summary>Synchronous handler with <see cref="StepResult"/>.</summary>
     public InputBuilder<TInput, TData> OnInput(Func<FlowContext<TData>, TInput, StepResult> handler)
     {
         _parent.SetHandler((ctx, input) => Task.FromResult(handler((FlowContext<TData>)ctx, _extractor(input))));
         return this;
     }
 
-    /// <summary>Handler semplificato: esegue un'azione e avanza sempre al prossimo step.</summary>
+    /// <summary>Simplified handler: executes an action and always advances to the next step.</summary>
     public InputBuilder<TInput, TData> OnInput(Action<FlowContext<TData>, TInput> handler)
     {
         _parent.SetHandler((ctx, input) =>

@@ -5,7 +5,7 @@ using InputMedia = TelegramChatFlow.Models.Input.InputMedia;
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// Validazione dell'input utente ed esecuzione dell'handler dello step.
+/// User input validation and step handler execution.
 /// </summary>
 public sealed class StepInputProcessor
 {
@@ -26,7 +26,7 @@ public sealed class StepInputProcessor
         _logger = logger;
     }
 
-    /// <summary>Elabora l'input dell'utente per lo step corrente.</summary>
+    /// <summary>Processes the user's input for the current step.</summary>
     public async Task ProcessStepInputAsync(FlowSession session, UserInput input)
     {
         var flow = _registry.GetFlow(session.CurrentFlowId!);
@@ -36,14 +36,14 @@ public sealed class StepInputProcessor
 
         var step = flow.Steps[session.CurrentStepIndex];
 
-        // Step display-only: nessun input da elaborare
+        // Display-only step: no input to process
         if (step.InputType == InputType.None) return;
 
-        // Valida che il tipo di input corrisponda a quello atteso dallo step
+        // Validate that the input type matches the type expected by the step
         var mismatch = step.InputType switch
         {
-            InputType.Text when input.Text is null => "Invia un messaggio di testo.",
-            InputType.Media when input.Media is null => "Invia un file multimediale.",
+            InputType.Text when input.Text is null => "Please send a text message.",
+            InputType.Media when input.Media is null => "Please send a media file.",
             _ => null
         };
 
@@ -53,11 +53,11 @@ public sealed class StepInputProcessor
             return;
         }
 
-        // Ignora messaggi di testo su step che aspettano bottoni inline (nessun feedback)
+        // Ignore text messages on steps expecting inline buttons (no feedback)
         if (step.InputType == InputType.InlineButtons && input.CallbackData is null)
             return;
 
-        // Snapshot dei dati prima che l'handler li modifichi (per il back)
+        // Snapshot data before the handler modifies it (for back navigation)
         var dataSnapshot = flow.CloneData(session.Data!);
 
         var context = flow.CreateContext(session.Data!);
@@ -69,9 +69,9 @@ public sealed class StepInputProcessor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Errore nell'handler dello step {StepId} del flusso {FlowId}",
+            _logger.LogError(ex, "Error in handler for step {StepId} of flow {FlowId}",
                 step.Id, flow.Id);
-            context.ValidationError = "Si è verificato un errore. Riprova.";
+            context.ValidationError = "An error occurred. Please try again.";
             result = StepResult.Retry;
         }
 
@@ -100,7 +100,7 @@ public sealed class StepInputProcessor
         }
     }
 
-    /// <summary>Estrae l'input dall'oggetto Message di Telegram.</summary>
+    /// <summary>Extracts the user input from a Telegram Message object.</summary>
     public static UserInput ExtractUserInput(Message message)
     {
         if (message.Photo is { Length: > 0 } photos)

@@ -4,8 +4,8 @@ using Microsoft.Extensions.Options;
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// Controlla periodicamente le sessioni attive e resetta quelle inattive
-/// oltre la soglia configurata.
+/// Periodically checks active sessions and resets those that are inactive
+/// beyond the configured threshold.
 /// </summary>
 public sealed class InactivityWatchdog : IDisposable
 {
@@ -46,14 +46,14 @@ public sealed class InactivityWatchdog : IDisposable
             foreach (var session in sessions)
             {
                 if (session.CurrentFlowId is null || session.LastActivity >= cutoff) continue;
-                _logger.LogInformation("Sessione chat {ChatId} scaduta per inattività", session.ChatId);
+                _logger.LogInformation("Chat session {ChatId} expired due to inactivity", session.ChatId);
 
                 await _engine.HandleInactivityAsync(session);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Errore nel watchdog di inattività");
+            _logger.LogError(ex, "Error in inactivity watchdog");
         }
     }
 

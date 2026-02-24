@@ -7,8 +7,8 @@ using Telegram.Bot.Types;
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// Orchestratore centrale: routing degli update Telegram, concurrency per-user,
-/// inizializzazione e gestione inattività. Delega la logica a servizi specializzati.
+/// Central orchestrator: Telegram update routing, per-user concurrency,
+/// initialization, and inactivity management. Delegates logic to specialized services.
 /// </summary>
 public sealed class FlowEngine
 {
@@ -44,11 +44,11 @@ public sealed class FlowEngine
     }
 
     // ═══════════════════════════════════════════════════════
-    //  API pubblica
+    //  Public API
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
-    /// Inizializzazione all'avvio: pulisce le sessioni orfane e riporta tutti al menu.
+    /// Startup initialization: cleans up orphan sessions and returns all users to the menu.
     /// </summary>
     public async Task InitializeAsync()
     {
@@ -63,12 +63,12 @@ public sealed class FlowEngine
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Errore inizializzazione sessione chat {ChatId}", session.ChatId);
+                _logger.LogWarning(ex, "Error initializing session for chat {ChatId}", session.ChatId);
             }
         }
     }
 
-    /// <summary>Gestisce un singolo update Telegram.</summary>
+    /// <summary>Handles a single Telegram update.</summary>
     public async Task HandleUpdateAsync(Update update)
     {
         var chatId = update.CallbackQuery?.Message?.Chat.Id
@@ -94,7 +94,7 @@ public sealed class FlowEngine
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Errore gestione update per chat {ChatId}", chatId.Value);
+            _logger.LogError(ex, "Error handling update for chat {ChatId}", chatId.Value);
         }
         finally
         {
@@ -102,7 +102,7 @@ public sealed class FlowEngine
         }
     }
 
-    /// <summary>Gestisce il timeout per inattività di una sessione.</summary>
+    /// <summary>Handles the inactivity timeout for a session.</summary>
     public async Task HandleInactivityAsync(FlowSession session)
     {
         var semaphore = _locks.GetOrAdd(session.ChatId, _ => new SemaphoreSlim(1, 1));
@@ -118,7 +118,7 @@ public sealed class FlowEngine
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Errore cleanup inattività per chat {ChatId}", session.ChatId);
+            _logger.LogError(ex, "Error handling inactivity for chat {ChatId}", session.ChatId);
         }
         finally
         {
@@ -127,7 +127,7 @@ public sealed class FlowEngine
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Gestione callback query
+    //  Callback query handling
     // ═══════════════════════════════════════════════════════
 
     private async Task HandleCallbackAsync(FlowSession session, CallbackQuery callback)
@@ -138,7 +138,7 @@ public sealed class FlowEngine
         }
         catch
         {
-            /* non-fatale: il callback potrebbe essere scaduto o già risposto */
+            /* non-fatal: the callback might be expired or already answered */
         }
 
         if (callback.Message?.MessageId != session.BotMessageId)
@@ -175,7 +175,7 @@ public sealed class FlowEngine
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Gestione messaggi utente
+    //  User message handling
     // ═══════════════════════════════════════════════════════
 
     private async Task HandleMessageAsync(FlowSession session, Message message)

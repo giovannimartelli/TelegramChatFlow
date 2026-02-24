@@ -6,81 +6,81 @@ using TelegramChatFlow.Builder.Flow;
 namespace TelegramChatFlow.Example.Flows;
 
 /// <summary>
-/// Flusso completo per la pubblicazione di un annuncio immobiliare.
-/// Dimostra: bottoni inline, reply keyboard, text input con validazione,
-/// media input/output, Persistent, Skippable, GoTo, testo dinamico, sub-flow handler-launched.
+/// Complete flow for publishing a real estate listing.
+/// Demonstrates: inline buttons, reply keyboard, text input with validation,
+/// media input/output, Persistent, Skippable, GoTo, dynamic text, handler-launched sub-flow.
 /// </summary>
-public sealed class AnnuncioFlow : FlowBase<AnnuncioFlow.AnnuncioData>
+public sealed class ListingFlow : FlowBase<ListingFlow.ListingData>
 {
-    public sealed class AnnuncioData
+    public sealed class ListingData
     {
-        public string? Tipo { get; set; }
-        public string? Zona { get; set; }
-        public string? Descrizione { get; set; }
-        public int? Prezzo { get; set; }
-        public List<FotoInfo> FotoLista { get; } = [];
-        public string? FotoTmpId { get; set; }
-        public string? FotoTmpDesc { get; set; }
-        public string? AllegatoId { get; set; }
-        public string? AllegatoNome { get; set; }
+        public string? PropertyType { get; set; }
+        public string? Area { get; set; }
+        public string? Description { get; set; }
+        public int? Price { get; set; }
+        public List<PhotoInfo> PhotoList { get; } = [];
+        public string? TempPhotoId { get; set; }
+        public string? TempPhotoDescription { get; set; }
+        public string? AttachmentId { get; set; }
+        public string? AttachmentName { get; set; }
     }
 
-    public sealed class FotoInfo
+    public sealed class PhotoInfo
     {
         public string FileId { get; set; } = "";
-        public string Descrizione { get; set; } = "";
+        public string Description { get; set; } = "";
         public string Tag { get; set; } = "";
 
         [JsonConstructor]
-        public FotoInfo() { }
+        public PhotoInfo() { }
 
-        public FotoInfo(string fileId, string descrizione, string tag)
+        public PhotoInfo(string fileId, string description, string tag)
         {
             FileId = fileId;
-            Descrizione = descrizione;
+            Description = description;
             Tag = tag;
         }
     }
 
-    protected override string Id => "annuncio";
-    protected override string MenuLabel => "🏠 Nuovo Annuncio";
+    protected override string Id => "listing";
+    protected override string MenuLabel => "🏠 New Listing";
 
-    protected override void Configure(FlowBuilder<AnnuncioData> builder)
+    protected override void Configure(FlowBuilder<ListingData> builder)
     {
         builder
-            // ── Step 1: tipo immobile (inline buttons, HideBack) ──
-            .Step("tipo", step => step
+            // ── Step 1: property type (inline buttons, HideBack) ──
+            .Step("property-type", step => step
                 .HideBack()
-                .Show(s => s.HasText("Che tipo di immobile vuoi pubblicare?"))
+                .Show(s => s.HasText("What type of property do you want to publish?"))
                 .Input(i => i
                     .UsingButtons(
-                        new InlineButton("🏢 Appartamento", "appartamento"),
+                        new InlineButton("🏢 Apartment", "apartment"),
                         new InlineButton("🏡 Villa", "villa"),
-                        new InlineButton("🏬 Ufficio", "ufficio"),
-                        new InlineButton("🏪 Locale Commerciale", "locale"))
-                    .OnInput((ctx, tipo) =>
+                        new InlineButton("🏬 Office", "office"),
+                        new InlineButton("🏪 Commercial Space", "commercial"))
+                    .OnInput((ctx, value) =>
                     {
-                        ctx.Data.Tipo = tipo;
+                        ctx.Data.PropertyType = value;
                     })))
 
-            // ── Step 2: zona (reply keyboard) ─────────────────────
-            .Step("zona", step => step
-                .Show(s => s.HasText("In quale zona si trova l'immobile?"))
+            // ── Step 2: area (reply keyboard) ─────────────────────
+            .Step("area", step => step
+                .Show(s => s.HasText("What area is the property in?"))
                 .Input(i => i
-                    .UsingKeyboard("Centro", "Collina", "Periferia", "Mare", "Campagna")
-                    .OnInput((ctx, zona) =>
+                    .UsingKeyboard("City Center", "Hills", "Suburbs", "Seaside", "Countryside")
+                    .OnInput((ctx, area) =>
                     {
-                        ctx.Data.Zona = zona;
+                        ctx.Data.Area = area;
                     })))
 
-            // ── Step 3: descrizione (text + validazione min 20 char, testo dinamico) ──
-            .Step("descrizione", step => step
+            // ── Step 3: description (text + min 20 char validation, dynamic text) ──
+            .Step("description", step => step
                 .Show(s => s.HasText(ctx =>
                 {
-                    var tipo = FormatTipo(ctx.Data.Tipo);
-                    var zona = ctx.Data.Zona;
-                    return $"Tipo: {tipo}\nZona: {zona}\n\n" +
-                           "Scrivi una descrizione dell'immobile (minimo 20 caratteri):";
+                    var type = FormatPropertyType(ctx.Data.PropertyType);
+                    var area = ctx.Data.Area;
+                    return $"Type: {type}\nArea: {area}\n\n" +
+                           "Write a description of the property (minimum 20 characters):";
                 }))
                 .Input(i => i
                     .UsingText()
@@ -88,176 +88,176 @@ public sealed class AnnuncioFlow : FlowBase<AnnuncioFlow.AnnuncioData>
                     {
                         if (text.Length < 20)
                         {
-                            ctx.ValidationError = "La descrizione deve essere di almeno 20 caratteri.";
+                            ctx.ValidationError = "The description must be at least 20 characters.";
                             return StepResult.Retry;
                         }
-                        ctx.Data.Descrizione = text;
+                        ctx.Data.Description = text;
                         return StepResult.Next;
                     })))
 
-            // ── Step 4: prezzo (text + validazione numerica) ──────
-            .Step("prezzo", step => step
-                .Show(s => s.HasText("Inserisci il prezzo in euro (solo numeri):"))
+            // ── Step 4: price (text + numeric validation) ──────
+            .Step("price", step => step
+                .Show(s => s.HasText("Enter the price in euros (numbers only):"))
                 .Input(i => i
                     .UsingText()
                     .OnInput((ctx, text) =>
                     {
-                        if (!int.TryParse(text, out var prezzo) || prezzo < 1)
+                        if (!int.TryParse(text, out var price) || price < 1)
                         {
-                            ctx.ValidationError = "Inserisci un prezzo valido (numero intero maggiore di 0).";
+                            ctx.ValidationError = "Enter a valid price (positive integer).";
                             return StepResult.Retry;
                         }
-                        ctx.Data.Prezzo = prezzo;
+                        ctx.Data.Price = price;
                         return StepResult.Next;
                     })))
 
-            // ── Step 5: avvia sub-flow foto dettagli ──────────────
-            .Step("avvia_foto", step => step
-                .Show(s => s.HasText("Inseriamo la foto dell'immobile"))
+            // ── Step 5: start photo details sub-flow ──────────────
+            .Step("start-photos", step => step
+                .Show(s => s.HasText("Let's add photos of the property"))
                 .Input(i => i
-                    .UsingButtons(new InlineButton("📸 Inizia", "go"))
-                    .OnInput((ctx, cb) => StepResult.SubFlow("foto_dettagli"))))
+                    .UsingButtons(new InlineButton("📸 Start", "go"))
+                    .OnInput((ctx, cb) => StepResult.SubFlow("photo-details"))))
 
-            // ── Step 6: conferma foto (riepilogo lista foto) ──
-            .Step("conferma_foto", step => step
+            // ── Step 6: confirm photos (photo list summary) ──
+            .Step("confirm-photos", step => step
                 .Show(s => s.HasText(ctx =>
                 {
-                    var lista = ctx.Data.FotoLista;
+                    var list = ctx.Data.PhotoList;
                     var sb = new StringBuilder();
-                    sb.AppendLine($"📸 {lista.Count} foto caricate:\n");
-                    for (var i = 0; i < lista.Count; i++)
-                        sb.AppendLine($"{i + 1}. {lista[i].Descrizione} [{lista[i].Tag}]");
-                    sb.AppendLine("\nSei a posto?");
+                    sb.AppendLine($"📸 {list.Count} photo(s) uploaded:\n");
+                    for (var i = 0; i < list.Count; i++)
+                        sb.AppendLine($"{i + 1}. {list[i].Description} [{list[i].Tag}]");
+                    sb.AppendLine("\nAre you done?");
                     return sb.ToString();
                 }))
                 .Input(i => i
                     .UsingButtons(
-                        new InlineButton("✅ Sì", "si"),
-                        new InlineButton("🔄 No, rifai", "no"))
+                        new InlineButton("✅ Yes", "yes"),
+                        new InlineButton("🔄 No, redo", "no"))
                     .OnInput((ctx, cb) => cb == "no"
-                        ? StepResult.GoTo("avvia_foto")
+                        ? StepResult.GoTo("start-photos")
                         : StepResult.Next)))
 
-            // ── Step 7: allegato opzionale (media, Skippable) ────
-            .Step("allegato", step => step
+            // ── Step 7: optional attachment (media, Skippable) ────
+            .Step("attachment", step => step
                 .Skippable()
-                .Show(s => s.HasText("Se vuoi, invia un documento o una planimetria (oppure salta):"))
+                .Show(s => s.HasText("Optionally, send a document or floor plan (or skip):"))
                 .Input(i => i
                     .UsingMedia()
                     .OnInput((ctx, media) =>
                     {
-                        ctx.Data.AllegatoId = media.FileId;
-                        ctx.Data.AllegatoNome = media.FileName ?? "documento";
+                        ctx.Data.AttachmentId = media.FileId;
+                        ctx.Data.AttachmentName = media.FileName ?? "document";
                     })))
 
-            // ── Step 8: riepilogo (testo dinamico + media output + GoTo/Exit) ──
-            .Step("riepilogo", step => step
+            // ── Step 8: summary (dynamic text + media output + GoTo/Exit) ──
+            .Step("summary", step => step
                 .Show(s => s
                     .HasPhoto(
-                        ctx => ctx.Data.FotoLista[0].FileId,
+                        ctx => ctx.Data.PhotoList[0].FileId,
                         ctx =>
                         {
-                            var tipo = FormatTipo(ctx.Data.Tipo);
-                            var zona = ctx.Data.Zona;
-                            var desc = ctx.Data.Descrizione;
-                            var prezzo = ctx.Data.Prezzo;
-                            var fotoCount = ctx.Data.FotoLista.Count;
-                            var allegato = ctx.Data.AllegatoNome;
+                            var type = FormatPropertyType(ctx.Data.PropertyType);
+                            var area = ctx.Data.Area;
+                            var desc = ctx.Data.Description;
+                            var price = ctx.Data.Price;
+                            var photoCount = ctx.Data.PhotoList.Count;
+                            var attachment = ctx.Data.AttachmentName;
 
-                            return $"📋 Riepilogo Annuncio\n\n" +
-                                   $"🏠 Tipo: {tipo}\n" +
-                                   $"📍 Zona: {zona}\n" +
-                                   $"📝 Descrizione: {desc}\n" +
-                                   $"💰 Prezzo: {prezzo:N0} €\n" +
-                                   $"📸 Foto: {fotoCount}\n" +
-                                   $"📎 Allegato: {(allegato != null ? allegato : "nessuno")}";
+                            return $"📋 Listing Summary\n\n" +
+                                   $"🏠 Type: {type}\n" +
+                                   $"📍 Area: {area}\n" +
+                                   $"📝 Description: {desc}\n" +
+                                   $"💰 Price: {price:N0} €\n" +
+                                   $"📸 Photos: {photoCount}\n" +
+                                   $"📎 Attachment: {(attachment != null ? attachment : "none")}";
                         }))
                 .Input(i => i
                     .UsingButtons(
-                        new InlineButton("✅ Pubblica", "pubblica"),
-                        new InlineButton("✏️ Modifica Descrizione", "modifica"),
-                        new InlineButton("❌ Annulla", "annulla"))
+                        new InlineButton("✅ Publish", "publish"),
+                        new InlineButton("✏️ Edit Description", "edit"),
+                        new InlineButton("❌ Cancel", "cancel"))
                     .OnInput((ctx, callback) => callback switch
                     {
-                        "modifica" => StepResult.GoTo("descrizione"),
-                        "annulla" => StepResult.Exit,
+                        "edit" => StepResult.GoTo("description"),
+                        "cancel" => StepResult.Exit,
                         _ => StepResult.Next
                     })))
 
-            // ── Step 9: conferma pubblicazione (display-only) ────
-            .Step("pubblicato", step => step
+            // ── Step 9: publish confirmation (display-only) ────
+            .Step("published", step => step
                 .HideBack()
-                .Show(s => s.HasText("✅ Annuncio pubblicato con successo!")))
+                .Show(s => s.HasText("✅ Listing published successfully!")))
 
             // ── Sub-flow ─────────────────────────────────────────
-            .SubFlow(new FotoDettagliFlow());
+            .SubFlow(new PhotoDetailsFlow());
     }
 
-    private static string FormatTipo(string? code) => code switch
+    private static string FormatPropertyType(string? code) => code switch
     {
-        "appartamento" => "🏢 Appartamento",
+        "apartment" => "🏢 Apartment",
         "villa" => "🏡 Villa",
-        "ufficio" => "🏬 Ufficio",
-        "locale" => "🏪 Locale Commerciale",
-        _ => "❓ Altro"
+        "office" => "🏬 Office",
+        "commercial" => "🏪 Commercial Space",
+        _ => "❓ Other"
     };
 
-    // ── Sub-flow: Foto con dettagli (loop multi-foto) ──────────
-    private sealed class FotoDettagliFlow : FlowBase<AnnuncioData>
+    // ── Sub-flow: Photo with details (multi-photo loop) ──────────
+    private sealed class PhotoDetailsFlow : FlowBase<ListingData>
     {
-        protected override string Id => "foto_dettagli";
-        protected override string MenuLabel => "📸 Foto Dettagli";
+        protected override string Id => "photo-details";
+        protected override string MenuLabel => "📸 Photo Details";
 
-        protected override void Configure(FlowBuilder<AnnuncioData> builder)
+        protected override void Configure(FlowBuilder<ListingData> builder)
         {
             builder
-                // Upload foto
+                // Upload photo
                 .Step("upload", step => step
                     .Persistent()
-                    .Show(s => s.HasText("Invia la foto dell'immobile:"))
+                    .Show(s => s.HasText("Send a photo of the property:"))
                     .Input(i => i
                         .UsingMedia()
                         .OnInput((ctx, media) =>
                         {
-                            ctx.Data.FotoTmpId = media.FileId;
+                            ctx.Data.TempPhotoId = media.FileId;
                         })))
 
-                // Descrizione foto
-                .Step("desc_foto", step => step
-                    .Show(s => s.HasText("Scrivi una descrizione per la foto:"))
+                // Photo description
+                .Step("photo-desc", step => step
+                    .Show(s => s.HasText("Write a description for the photo:"))
                     .Input(i => i
                         .UsingText()
                         .OnInput((ctx, text) =>
                         {
-                            ctx.Data.FotoTmpDesc = text;
+                            ctx.Data.TempPhotoDescription = text;
                         })))
 
-                // Tag foto + accumula nella lista
-                .Step("tag_foto", step => step
-                    .Show(s => s.HasText("Inserisci un tag per la foto (es. esterno, interno, giardino):"))
+                // Photo tag + add to list
+                .Step("photo-tag", step => step
+                    .Show(s => s.HasText("Enter a tag for the photo (e.g. exterior, interior, garden):"))
                     .Input(i => i
                         .UsingText()
                         .OnInput((ctx, text) =>
                         {
-                            var foto = new FotoInfo(
-                                ctx.Data.FotoTmpId!,
-                                ctx.Data.FotoTmpDesc!,
+                            var photo = new PhotoInfo(
+                                ctx.Data.TempPhotoId!,
+                                ctx.Data.TempPhotoDescription!,
                                 text);
-                            ctx.Data.FotoLista.Add(foto);
+                            ctx.Data.PhotoList.Add(photo);
                         })))
 
-                // Chiedi se aggiungere un'altra foto
-                .Step("altra_foto", step => step
+                // Ask if user wants to add another photo
+                .Step("add-photo", step => step
                     .Show(s => s.HasText(ctx =>
                     {
-                        var count = ctx.Data.FotoLista.Count;
-                        return $"📸 {count} foto caricata/e. Vuoi aggiungerne un'altra?";
+                        var count = ctx.Data.PhotoList.Count;
+                        return $"📸 {count} photo(s) uploaded. Do you want to add another?";
                     }))
                     .Input(i => i
                         .UsingButtons(
-                            new InlineButton("📸 Sì, un'altra", "altra"),
-                            new InlineButton("✅ Ho finito", "fine"))
-                        .OnInput((ctx, cb) => cb == "altra"
+                            new InlineButton("📸 Yes, another", "another"),
+                            new InlineButton("✅ Done", "done"))
+                        .OnInput((ctx, cb) => cb == "another"
                             ? StepResult.GoTo("upload")
                             : StepResult.Next)));
         }

@@ -4,8 +4,8 @@ using TelegramChatFlow.Builder.Flow;
 namespace TelegramChatFlow.Example.Flows;
 
 /// <summary>
-/// Flusso di esempio a 4 step: categoria → messaggio → conferma → risultato.
-/// Dimostra l'uso di bottoni inline, input testuale, validazione, riepilogo e step display-only.
+/// Example flow with 4 steps: category → message → confirmation → result.
+/// Demonstrates the use of inline buttons, text input, validation, summary, and display-only steps.
 /// </summary>
 public sealed class FeedbackFlow : FlowBase<FeedbackFlow.FeedbackData>
 {
@@ -22,25 +22,25 @@ public sealed class FeedbackFlow : FlowBase<FeedbackFlow.FeedbackData>
     protected override void Configure(FlowBuilder<FeedbackData> builder)
     {
         builder
-            // ── Step 1: selezione categoria ──────────────
+            // ── Step 1: category selection ──────────────
             .Step("category", step => step
-                .Show(s => s.HasText("Che tipo di feedback vuoi lasciare?"))
+                .Show(s => s.HasText("What type of feedback do you want to leave?"))
                 .Input(i => i
                     .UsingButtons(
                         new InlineButton("🐛 Bug", "bug"),
-                        new InlineButton("💡 Suggerimento", "suggestion"),
-                        new InlineButton("⭐ Complimento", "praise"))
+                        new InlineButton("💡 Suggestion", "suggestion"),
+                        new InlineButton("⭐ Compliment", "praise"))
                     .OnInput((ctx, callbackData) =>
                     {
                         ctx.Data.Category = callbackData;
                     })))
 
-            // ── Step 2: messaggio testuale ───────────────
+            // ── Step 2: text message ───────────────
             .Step("message", step => step
                 .Show(s => s.HasText(ctx =>
                 {
                     var label = FormatCategory(ctx.Data.Category);
-                    return $"Categoria: {label}\n\nScrivi il tuo messaggio:";
+                    return $"Category: {label}\n\nWrite your message:";
                 }))
                 .Input(i => i
                     .UsingText()
@@ -48,28 +48,28 @@ public sealed class FeedbackFlow : FlowBase<FeedbackFlow.FeedbackData>
                     {
                         if (string.IsNullOrWhiteSpace(text))
                         {
-                            ctx.ValidationError = "Il messaggio non può essere vuoto.";
+                            ctx.ValidationError = "The message cannot be empty.";
                             return StepResult.Retry;
                         }
                         ctx.Data.Message = text;
                         return StepResult.Next;
                     })))
 
-            // ── Step 3: riepilogo e conferma ─────────────
+            // ── Step 3: summary and confirmation ─────────────
             .Step("confirm", step => step
                 .Show(s => s.HasText(ctx =>
                 {
                     var label = FormatCategory(ctx.Data.Category);
                     var msg = ctx.Data.Message;
-                    return $"📋 Riepilogo\n\n" +
-                           $"Categoria: {label}\n" +
-                           $"Messaggio: {msg}\n\n" +
-                           $"Confermi l'invio?";
+                    return $"📋 Summary\n\n" +
+                           $"Category: {label}\n" +
+                           $"Message: {msg}\n\n" +
+                           $"Confirm sending?";
                 }))
                 .Input(i => i
                     .UsingButtons(
-                        new InlineButton("✅ Conferma", "confirm"),
-                        new InlineButton("❌ Annulla", "cancel"))
+                        new InlineButton("✅ Confirm", "confirm"),
+                        new InlineButton("❌ Cancel", "cancel"))
                     .OnInput((ctx, callbackData) =>
                     {
                         if (callbackData == "cancel")
@@ -77,23 +77,23 @@ public sealed class FeedbackFlow : FlowBase<FeedbackFlow.FeedbackData>
                             ctx.Data.Cancelled = true;
                             return StepResult.Next;
                         }
-                        // Qui salveresti il feedback su DB, invieresti una notifica, ecc.
-                        Console.WriteLine($"[Feedback ricevuto] Categoria: {ctx.Data.Category} | Messaggio: {ctx.Data.Message}");
+                        // Here you would save the feedback to DB, send a notification, etc.
+                        Console.WriteLine($"[Feedback received] Category: {ctx.Data.Category} | Message: {ctx.Data.Message}");
                         return StepResult.Next;
                     })))
 
-            // ── Step 4: risultato (display-only) ─────────
+            // ── Step 4: result (display-only) ─────────
             .Step("result", step => step
                 .Show(s => s.HasText(ctx => ctx.Data.Cancelled
-                    ? "❌ Oh nooo, hai annullato!"
-                    : "✅ OOOOK MANDATO, feedback inviato!")));
+                    ? "❌ Cancelled!"
+                    : "✅ Feedback sent!")));
     }
 
     private static string FormatCategory(string? code) => code switch
     {
         "bug" => "🐛 Bug",
-        "suggestion" => "💡 Suggerimento",
-        "praise" => "⭐ Complimento",
-        _ => "❓ Altro"
+        "suggestion" => "💡 Suggestion",
+        "praise" => "⭐ Compliment",
+        _ => "❓ Other"
     };
 }

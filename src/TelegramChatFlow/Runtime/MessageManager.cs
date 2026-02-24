@@ -8,8 +8,8 @@ using InputMedia = Telegram.Bot.Types.InputMedia;
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// Gestisce l'invio, la modifica e la cancellazione dei messaggi Telegram.
-/// Mantiene la chat pulita editando il messaggio esistente dove possibile.
+/// Manages sending, editing, and deleting Telegram messages.
+/// Keeps the chat clean by editing the existing message where possible.
 /// </summary>
 public sealed class MessageManager
 {
@@ -23,7 +23,7 @@ public sealed class MessageManager
     }
 
     /// <summary>
-    /// Invia un nuovo messaggio o modifica quello esistente (il messaggio "persistente" del bot).
+    /// Sends a new message or edits the existing one (the bot's active message).
     /// </summary>
     public async Task SendOrEditAsync(FlowSession session, string text, InlineKeyboardMarkup? markup)
     {
@@ -41,14 +41,14 @@ public sealed class MessageManager
             _bot.SendMessage(session.ChatId, text, replyMarkup: markup));
     }
 
-    /// <summary>Invia un messaggio aggiuntivo con reply keyboard (tracciato per la pulizia).</summary>
+    /// <summary>Sends an additional message with reply keyboard (tracked for cleanup).</summary>
     public async Task SendReplyKeyboardAsync(FlowSession session, string text, ReplyKeyboardMarkup markup)
     {
         var msg = await _bot.SendMessage(session.ChatId, text, replyMarkup: markup);
         session.TrackedMessageIds.Add(msg.MessageId);
     }
 
-    /// <summary>Rimuove la reply keyboard inviando e cancellando un messaggio di servizio.</summary>
+    /// <summary>Removes the reply keyboard by sending and deleting a service message.</summary>
     public async Task RemoveReplyKeyboardAsync(long chatId)
     {
         try
@@ -58,11 +58,11 @@ public sealed class MessageManager
         }
         catch (ApiRequestException ex)
         {
-            _logger.LogWarning(ex, "Impossibile rimuovere reply keyboard per chat {ChatId}", chatId);
+            _logger.LogWarning(ex, "Failed to remove reply keyboard for chat {ChatId}", chatId);
         }
     }
 
-    /// <summary>Cancella un messaggio ignorando eventuali errori.</summary>
+    /// <summary>Deletes a message ignoring any errors.</summary>
     public async Task TryDeleteAsync(long chatId, int messageId)
     {
         try
@@ -71,11 +71,11 @@ public sealed class MessageManager
         }
         catch (ApiRequestException)
         {
-            // Il messaggio potrebbe essere già cancellato o troppo vecchio
+            // The message might already be deleted or too old
         }
     }
 
-    /// <summary>Cancella i messaggi transitori (reply keyboard, ecc.) ma NON quelli persistenti.</summary>
+    /// <summary>Deletes transient messages (reply keyboard, etc.) but NOT persistent ones.</summary>
     public async Task CleanupTransientMessagesAsync(FlowSession session)
     {
         foreach (var msgId in session.TrackedMessageIds)
@@ -84,7 +84,7 @@ public sealed class MessageManager
         session.TrackedMessageIds.Clear();
     }
 
-    /// <summary>Cancella i messaggi persistenti degli step marcati Persistent.</summary>
+    /// <summary>Deletes persistent messages from steps marked as Persistent.</summary>
     public async Task CleanupPersistentMessagesAsync(FlowSession session)
     {
         foreach (var msgId in session.PersistentMessageIds)
@@ -93,7 +93,7 @@ public sealed class MessageManager
         session.PersistentMessageIds.Clear();
     }
 
-    /// <summary>Cancella tutti i messaggi del flusso (transitori + persistenti).</summary>
+    /// <summary>Deletes all flow messages (transient + persistent).</summary>
     public async Task CleanupAllFlowMessagesAsync(FlowSession session)
     {
         await CleanupTransientMessagesAsync(session);
@@ -101,15 +101,15 @@ public sealed class MessageManager
     }
 
     /// <summary>
-    /// "Stacca" il messaggio corrente del bot: rimuove la tastiera inline,
-    /// lo sposta tra i messaggi persistenti e annulla BotMessageId.
-    /// Il prossimo SendOrEditAsync invierà un messaggio nuovo.
+    /// Detaches the current bot message: removes the inline keyboard,
+    /// moves it to persistent messages, and clears BotMessageId.
+    /// The next SendOrEditAsync call will send a new message.
     /// </summary>
     public async Task DetachBotMessageAsync(FlowSession session)
     {
         if (session.BotMessageId == null) return;
 
-        // Rimuovi la inline keyboard dal messaggio staccato
+        // Remove the inline keyboard from the detached message
         try
         {
             await _bot.EditMessageReplyMarkup(
@@ -117,14 +117,14 @@ public sealed class MessageManager
                 session.BotMessageId.Value,
                 replyMarkup: null);
         }
-        catch (ApiRequestException) { /* messaggio potrebbe non essere più editabile */ }
+        catch (ApiRequestException) { /* message might no longer be editable */ }
 
         session.PersistentMessageIds.Add(session.BotMessageId.Value);
         session.BotMessageId = null;
     }
 
     /// <summary>
-    /// Invia o modifica il messaggio attivo del bot con un media.
+    /// Sends or edits the active bot message with media.
     /// </summary>
     public async Task SendOrEditMediaAsync(
         FlowSession session, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
@@ -143,7 +143,7 @@ public sealed class MessageManager
             SendMediaMessageAsync(session.ChatId, showMediaType, fileId, caption, markup));
     }
 
-    /// <summary>Invia un media aggiuntivo (senza markup) tracciato per la pulizia.</summary>
+    /// <summary>Sends an additional media message (without markup), tracked for cleanup.</summary>
     public async Task SendTrackedMediaAsync(FlowSession session, ShowMediaType showMediaType, string fileId)
     {
         var msg = await SendMediaMessageAsync(session.ChatId, showMediaType, fileId, caption: null, markup: null);
@@ -159,11 +159,11 @@ public sealed class MessageManager
         }
         catch (ApiRequestException ex) when (ex.Message.Contains("message is not modified"))
         {
-            return true; // contenuto identico, nessuna azione
+            return true; // identical content, no action needed
         }
         catch (ApiRequestException ex)
         {
-            _logger.LogWarning(ex, "Impossibile editare messaggio, ne invio uno nuovo");
+            _logger.LogWarning(ex, "Failed to edit message, sending a new one");
             return false;
         }
     }

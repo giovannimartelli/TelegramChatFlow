@@ -1,8 +1,8 @@
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// State machine di navigazione: gestisce l'avanzamento tra step,
-/// l'ingresso/uscita dai sub-flow e il ritorno al menu.
+/// Navigation state machine: handles step advancement,
+/// entering/exiting sub-flows, and returning to the menu.
 /// </summary>
 public sealed class FlowNavigator
 {
@@ -20,7 +20,7 @@ public sealed class FlowNavigator
         _messages = messages;
     }
 
-    /// <summary>Avanza allo step successivo, al menu sub-flow, o completa il flusso.</summary>
+    /// <summary>Advances to the next step, or completes the flow.</summary>
     public async Task AdvanceAsync(FlowSession session, FlowDefinition flow,
         object? dataSnapshot = null)
     {
@@ -46,7 +46,7 @@ public sealed class FlowNavigator
         }
     }
 
-    /// <summary>Torna allo step precedente, al flusso genitore, o al menu.</summary>
+    /// <summary>Goes back to the previous step, parent flow, or menu.</summary>
     public async Task GoBackAsync(FlowSession session)
     {
         if (session.CurrentFlowId is null) return;
@@ -86,7 +86,7 @@ public sealed class FlowNavigator
         }
     }
 
-    /// <summary>Salta direttamente a uno step per ID.</summary>
+    /// <summary>Jumps directly to a step by ID.</summary>
     public async Task GoToStepAsync(FlowSession session, FlowDefinition flow, string stepId,
         object dataSnapshot)
     {
@@ -113,7 +113,7 @@ public sealed class FlowNavigator
         await _renderer.RenderStepAsync(session, flow.Steps[targetIdx]);
     }
 
-    /// <summary>Salta lo step corrente (se è skippable).</summary>
+    /// <summary>Skips the current step (if it is skippable).</summary>
     public async Task SkipStepAsync(FlowSession session)
     {
         if (session.CurrentFlowId is null) return;
@@ -126,7 +126,7 @@ public sealed class FlowNavigator
             await AdvanceAsync(session, flow, flow.CloneData(session.Data!));
     }
 
-    /// <summary>Avvia un flusso root.</summary>
+    /// <summary>Starts a root flow.</summary>
     public async Task StartFlowAsync(FlowSession session, string flowId)
     {
         if (!_registry.TryGetRootFlow(flowId, out var flow)) return;
@@ -139,7 +139,7 @@ public sealed class FlowNavigator
             await _renderer.RenderStepAsync(session, flow.Steps[0]);
     }
 
-    /// <summary>Avvia un sub-flow dall'handler, salvando il frame corrente nello stack.</summary>
+    /// <summary>Starts a sub-flow from a handler, saving the current frame on the stack.</summary>
     public async Task StartSubFlowAsync(FlowSession session, string subFlowId,
         object dataSnapshot)
     {
@@ -162,7 +162,7 @@ public sealed class FlowNavigator
             await _renderer.RenderStepAsync(session, sub.Steps[0]);
     }
 
-    /// <summary>Completa il flusso corrente e torna al genitore o al menu.</summary>
+    /// <summary>Completes the current flow and returns to the parent or menu.</summary>
     public async Task CompleteCurrentFlowAsync(FlowSession session)
     {
         if (session.FlowStack.Count > 0)
@@ -184,7 +184,7 @@ public sealed class FlowNavigator
         }
     }
 
-    /// <summary>Resetta la sessione e mostra il menu principale.</summary>
+    /// <summary>Resets the session and shows the main menu.</summary>
     public async Task ResetToMenuAsync(FlowSession session)
     {
         await _messages.CleanupAllFlowMessagesAsync(session);

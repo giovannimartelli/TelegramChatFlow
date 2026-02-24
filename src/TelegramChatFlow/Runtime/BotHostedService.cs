@@ -7,42 +7,30 @@ using Telegram.Bot.Types.Enums;
 namespace TelegramChatFlow.Runtime;
 
 /// <summary>
-/// Hosted service che avvia il polling Telegram e il watchdog di inattività.
+/// Hosted service that starts Telegram polling and the inactivity watchdog.
 /// </summary>
-public sealed class BotHostedService : BackgroundService
+public sealed class BotHostedService(
+    ITelegramBotClient bot,
+    FlowEngine engine,
+    InactivityWatchdog watchdog,
+    ILogger<BotHostedService> logger)
+    : BackgroundService
 {
-    private readonly ITelegramBotClient _bot;
-    private readonly FlowEngine _engine;
-    private readonly InactivityWatchdog _watchdog;
-    private readonly ILogger<BotHostedService> _logger;
-
-    public BotHostedService(
-        ITelegramBotClient bot,
-        FlowEngine engine,
-        InactivityWatchdog watchdog,
-        ILogger<BotHostedService> logger)
-    {
-        _bot = bot;
-        _engine = engine;
-        _watchdog = watchdog;
-        _logger = logger;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Inizializzazione bot...");
-        await _engine.InitializeAsync();
+        logger.LogInformation("Starting bot...");
+        await engine.InitializeAsync();
 
-        _watchdog.Start();
+        watchdog.Start();
 
-        var me = await _bot.GetMe(stoppingToken);
-        _logger.LogInformation("Bot avviato: @{Username}", me.Username);
+        var me = await bot.GetMe(stoppingToken);
+        logger.LogInformation("Bot Started: @{Username}", me.Username);
 
-        _bot.StartReceiving(
-            updateHandler: (_, update, _) => _engine.HandleUpdateAsync(update),
+        bot.StartReceiving(
+            updateHandler: (_, update, _) => engine.HandleUpdateAsync(update),
             errorHandler: (_, ex, source, _) =>
             {
-                _logger.LogError(ex, "Errore polling ({Source})", source);
+                logger.LogError(ex, "Polling Error ({Source})", source);
                 return Task.CompletedTask;
             },
             receiverOptions: new ReceiverOptions
@@ -57,7 +45,7 @@ public sealed class BotHostedService : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Bot in arresto...");
+            logger.LogInformation("Shoting down bot...");
         }
     }
 }
