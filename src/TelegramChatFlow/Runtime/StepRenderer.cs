@@ -8,36 +8,25 @@ namespace TelegramChatFlow.Runtime;
 /// Step and main menu rendering.
 /// Also builds inline and navigation keyboards.
 /// </summary>
-public sealed class StepRenderer
+public sealed class StepRenderer(
+    MessageManager messages,
+    IOptions<FlowBotOptions> options,
+    FlowRegistry registry)
 {
-    private readonly MessageManager _messages;
-    private readonly FlowBotOptions _options;
-    private readonly FlowRegistry _registry;
-
-    public StepRenderer(
-        MessageManager messages,
-        IOptions<FlowBotOptions> options,
-        FlowRegistry registry)
-    {
-        _messages = messages;
-        _options = options.Value;
-        _registry = registry;
-    }
+    private readonly FlowBotOptions _options = options.Value;
 
     /// <summary>Renders a step: text/media + inline keyboard.</summary>
-    public async Task RenderStepAsync(
-        FlowSession session, StepDefinition step, string? error = null,
-        ShowDefinition? showOverride = null)
+    public async Task RenderStepAsync(FlowSession session, StepDefinition step, string? error = null, ShowDefinition? showOverride = null)
     {
-        await _messages.CleanupTransientMessagesAsync(session);
+        await messages.CleanupTransientMessagesAsync(session);
 
         if (session.HasReplyKeyboard)
         {
-            await _messages.RemoveReplyKeyboardAsync(session.ChatId);
+            await messages.RemoveReplyKeyboardAsync(session.ChatId);
             session.HasReplyKeyboard = false;
         }
 
-        var flow = _registry.GetFlow(session.CurrentFlowId!);
+        var flow = registry.GetFlow(session.CurrentFlowId!);
         var ctx = flow!.CreateContext(session.Data!);
         var show = showOverride ?? step.Show;
 
@@ -48,22 +37,23 @@ public sealed class StepRenderer
                 var text = await show.Text!(ctx);
                 if (error is not null) text += $"\n\n⚠️ {error}";
 
-                if (step.InputType == InputType.ReplyKeyboard && step.ReplyKeyboardProvider is not null)
+                if (step is { InputType: InputType.ReplyKeyboard, ReplyKeyboardProvider: not null })
                 {
                     var nav = new InlineKeyboardMarkup([BuildNavigationRow(session, step)]);
-                    await _messages.SendOrEditAsync(session, text, nav);
+                    await messages.SendOrEditAsync(session, text, nav);
 
                     var buttons = await step.ReplyKeyboardProvider(ctx);
                     var rows = buttons.Select(b => new[] { new KeyboardButton(b) });
                     var replyMarkup = new ReplyKeyboardMarkup(rows) { ResizeKeyboard = true, OneTimeKeyboard = true };
-                    await _messages.SendReplyKeyboardAsync(session, "👇", replyMarkup);
+                    await messages.SendReplyKeyboardAsync(session, "👇", replyMarkup);
                     session.HasReplyKeyboard = true;
                 }
                 else
                 {
                     var markup = await BuildStepKeyboardAsync(session, step, ctx);
-                    await _messages.SendOrEditAsync(session, text, markup);
+                    await messages.SendOrEditAsync(session, text, markup);
                 }
+
                 break;
             }
 
@@ -73,7 +63,7 @@ public sealed class StepRenderer
                 var caption = show.Caption?.Invoke(ctx);
                 if (error is not null) caption = (caption is null ? "" : caption + "\n\n") + $"⚠️ {error}";
                 var markup = await BuildStepKeyboardAsync(session, step, ctx);
-                await _messages.SendOrEditMediaAsync(session, show.Media!.Value, fileId, caption, markup);
+                await messages.SendOrEditMediaAsync(session, show.Media!.Value, fileId, caption, markup);
                 break;
             }
 
@@ -82,10 +72,10 @@ public sealed class StepRenderer
                 var text = await show.Text!(ctx);
                 if (error is not null) text += $"\n\n⚠️ {error}";
                 var markup = await BuildStepKeyboardAsync(session, step, ctx);
-                await _messages.SendOrEditAsync(session, text, markup);
+                await messages.SendOrEditAsync(session, text, markup);
 
                 var fileId = show.MediaFileId!(ctx);
-                await _messages.SendTrackedMediaAsync(session, show.Media!.Value, fileId);
+                await messages.SendTrackedMediaAsync(session, show.Media!.Value, fileId);
                 break;
             }
         }
@@ -94,14 +84,14 @@ public sealed class StepRenderer
     /// <summary>Shows the main menu with all root flows.</summary>
     public async Task ShowMenuAsync(FlowSession session)
     {
-        var rows = _registry.RootFlows
+        var rows = registry.RootFlows
             .Select(f => new List<InlineKeyboardButton>
             {
                 InlineKeyboardButton.WithCallbackData(f.Label, $"flow:{f.Id}")
             })
             .ToList();
 
-        await _messages.SendOrEditAsync(session, _options.MainMenuText, new InlineKeyboardMarkup(rows));
+        await messages.SendOrEditAsync(session, _options.MainMenuText, new InlineKeyboardMarkup(rows));
     }
 
     private async Task<InlineKeyboardMarkup> BuildStepKeyboardAsync(

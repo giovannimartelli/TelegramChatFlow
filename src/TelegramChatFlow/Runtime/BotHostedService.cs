@@ -5,6 +5,7 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types.Enums;
 
 namespace TelegramChatFlow.Runtime;
+// OK VISTO
 
 /// <summary>
 /// Hosted service that starts Telegram polling and the inactivity watchdog.

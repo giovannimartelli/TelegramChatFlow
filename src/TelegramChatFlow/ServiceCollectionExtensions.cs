@@ -25,8 +25,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<ISessionStore, InMemorySessionStore>();
         services.AddSingleton<MessageManager>();
-        services.AddSingleton<IReadOnlyList<FlowDefinition>>(sp =>
-            sp.GetServices<FlowBase>().Select(f => f.Build()).ToList());
+        services.AddSingleton<IReadOnlyList<FlowDefinition>>(sp => sp.GetServices<FlowBase>().Select(f => f.Build()).ToList());
         services.AddSingleton<FlowRegistry>();
         services.AddSingleton<StepRenderer>();
         services.AddSingleton<FlowNavigator>();

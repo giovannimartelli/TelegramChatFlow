@@ -3,53 +3,43 @@ using Telegram.Bot.Types;
 using InputMedia = TelegramChatFlow.Models.Input.InputMedia;
 
 namespace TelegramChatFlow.Runtime;
+// OK VISTO
 
 /// <summary>
 /// User input validation and step handler execution.
 /// </summary>
-public sealed class StepInputProcessor
+public sealed class StepInputProcessor(
+    FlowRegistry registry,
+    FlowNavigator navigator,
+    StepRenderer renderer,
+    ILogger<StepInputProcessor> logger)
 {
-    private readonly FlowRegistry _registry;
-    private readonly FlowNavigator _navigator;
-    private readonly StepRenderer _renderer;
-    private readonly ILogger<StepInputProcessor> _logger;
-
-    public StepInputProcessor(
-        FlowRegistry registry,
-        FlowNavigator navigator,
-        StepRenderer renderer,
-        ILogger<StepInputProcessor> logger)
-    {
-        _registry = registry;
-        _navigator = navigator;
-        _renderer = renderer;
-        _logger = logger;
-    }
-
     /// <summary>Processes the user's input for the current step.</summary>
     public async Task ProcessStepInputAsync(FlowSession session, UserInput input)
     {
-        var flow = _registry.GetFlow(session.CurrentFlowId!);
-        if (flow is null) { await _navigator.ResetToMenuAsync(session); return; }
-
+        var flow = registry.GetFlow(session.CurrentFlowId!);
+        
         if (session.CurrentStepIndex >= flow.Steps.Count) return;
 
         var step = flow.Steps[session.CurrentStepIndex];
 
         // Display-only step: no input to process
-        if (step.InputType == InputType.None) return;
+        if (step.InputType == InputType.None) 
+            return;
 
         // Validate that the input type matches the type expected by the step
         var mismatch = step.InputType switch
         {
             InputType.Text when input.Text is null => "Please send a text message.",
+            InputType.ReplyKeyboard when input.Text is null => "Please send a text message.",
             InputType.Media when input.Media is null => "Please send a media file.",
+            InputType.WebApp when input.WebAppData is null => "Please use the web app.",
             _ => null
         };
 
         if (mismatch is not null)
         {
-            await _renderer.RenderStepAsync(session, step, mismatch);
+            await renderer.RenderStepAsync(session, step, mismatch);
             return;
         }
 
@@ -69,7 +59,7 @@ public sealed class StepInputProcessor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in handler for step {StepId} of flow {FlowId}",
+            logger.LogError(ex, "Error in handler for step {StepId} of flow {FlowId}",
                 step.Id, flow.Id);
             context.ValidationError = "An error occurred. Please try again.";
             result = StepResult.Retry;
@@ -80,22 +70,22 @@ public sealed class StepInputProcessor
         switch (result)
         {
             case StepResult.NextResult:
-                await _navigator.AdvanceAsync(session, flow, dataSnapshot);
+                await navigator.AdvanceAsync(session, flow, dataSnapshot);
                 break;
             case StepResult.RetryResult { Show: { } retryShow }:
-                await _renderer.RenderStepAsync(session, step, context.ValidationError, retryShow);
+                await renderer.RenderStepAsync(session, step, context.ValidationError, retryShow);
                 break;
             case StepResult.RetryResult:
-                await _renderer.RenderStepAsync(session, step, context.ValidationError);
+                await renderer.RenderStepAsync(session, step, context.ValidationError);
                 break;
             case StepResult.GoToResult { StepId: var targetId }:
-                await _navigator.GoToStepAsync(session, flow, targetId, dataSnapshot);
+                await navigator.GoToStepAsync(session, flow, targetId, dataSnapshot);
                 break;
             case StepResult.SubFlowResult { SubFlowId: var subFlowId }:
-                await _navigator.StartSubFlowAsync(session, subFlowId, dataSnapshot);
+                await navigator.StartSubFlowAsync(session, subFlowId, dataSnapshot);
                 break;
             case StepResult.ExitResult:
-                await _navigator.ResetToMenuAsync(session);
+                await navigator.ResetToMenuAsync(session);
                 break;
         }
     }

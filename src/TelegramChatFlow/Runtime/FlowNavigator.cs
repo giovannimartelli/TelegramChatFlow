@@ -1,44 +1,34 @@
 namespace TelegramChatFlow.Runtime;
 
+// OK VISTO
+
 /// <summary>
 /// Navigation state machine: handles step advancement,
 /// entering/exiting sub-flows, and returning to the menu.
 /// </summary>
-public sealed class FlowNavigator
+public sealed class FlowNavigator(
+    FlowRegistry registry,
+    StepRenderer renderer,
+    MessageManager messages)
 {
-    private readonly FlowRegistry _registry;
-    private readonly StepRenderer _renderer;
-    private readonly MessageManager _messages;
-
-    public FlowNavigator(
-        FlowRegistry registry,
-        StepRenderer renderer,
-        MessageManager messages)
-    {
-        _registry = registry;
-        _renderer = renderer;
-        _messages = messages;
-    }
-
     /// <summary>Advances to the next step, or completes the flow.</summary>
-    public async Task AdvanceAsync(FlowSession session, FlowDefinition flow,
-        object? dataSnapshot = null)
+    public async Task AdvanceAsync(FlowSession session, FlowDefinition flow, object dataSnapshot)
     {
         var currentStep = flow.Steps.ElementAtOrDefault(session.CurrentStepIndex);
         if (currentStep?.Persistent == true)
-            await _messages.DetachBotMessageAsync(session);
+            await messages.DetachPersistentMessageAsync(session);
 
         session.StepHistory.Push(new StepHistoryEntry
         {
             StepIndex = session.CurrentStepIndex,
-            Data = dataSnapshot ?? flow.CloneData(session.Data!)
+            Data = dataSnapshot
         });
         var next = session.CurrentStepIndex + 1;
 
         if (next < flow.Steps.Count)
         {
             session.CurrentStepIndex = next;
-            await _renderer.RenderStepAsync(session, flow.Steps[next]);
+            await renderer.RenderStepAsync(session, flow.Steps[next]);
         }
         else
         {
@@ -49,22 +39,17 @@ public sealed class FlowNavigator
     /// <summary>Goes back to the previous step, parent flow, or menu.</summary>
     public async Task GoBackAsync(FlowSession session)
     {
-        if (session.CurrentFlowId is null) return;
+        if (session.CurrentFlowId is null)
+            throw new InvalidOperationException("Cannot go back: no active flow.");
 
-        await _messages.CleanupPersistentMessagesAsync(session);
+        await messages.CleanupPersistentMessagesAsync(session);
 
         if (session.StepHistory.TryPop(out var entry))
         {
-            var flow = _registry.GetFlow(session.CurrentFlowId);
-            if (flow is null)
-            {
-                await ResetToMenuAsync(session);
-                return;
-            }
-
+            var flow = registry.GetFlow(session.CurrentFlowId);
             session.CurrentStepIndex = entry.StepIndex;
             session.Data = entry.Data;
-            await _renderer.RenderStepAsync(session, flow.Steps[entry.StepIndex]);
+            await renderer.RenderStepAsync(session, flow.Steps[entry.StepIndex]);
         }
         else if (session.FlowStack.Count > 0)
         {
@@ -73,12 +58,8 @@ public sealed class FlowNavigator
             session.CurrentStepIndex = frame.StepIndex;
             session.Data = frame.Data;
             session.StepHistory = frame.StepHistory;
-
-            var parent = _registry.GetFlow(frame.FlowId);
-            if (parent is not null)
-                await _renderer.RenderStepAsync(session, parent.Steps[frame.StepIndex]);
-            else
-                await ResetToMenuAsync(session);
+            var parent = registry.GetFlow(frame.FlowId);
+            await renderer.RenderStepAsync(session, parent.Steps[frame.StepIndex]);
         }
         else
         {
@@ -99,10 +80,7 @@ public sealed class FlowNavigator
             }
 
         if (targetIdx < 0)
-        {
-            await ResetToMenuAsync(session);
-            return;
-        }
+            throw new ArgumentException($"Step ID '{stepId}' not found in flow '{flow.Id}'.");
 
         session.StepHistory.Push(new StepHistoryEntry
         {
@@ -110,7 +88,7 @@ public sealed class FlowNavigator
             Data = dataSnapshot
         });
         session.CurrentStepIndex = targetIdx;
-        await _renderer.RenderStepAsync(session, flow.Steps[targetIdx]);
+        await renderer.RenderStepAsync(session, flow.Steps[targetIdx]);
     }
 
     /// <summary>Skips the current step (if it is skippable).</summary>
@@ -118,33 +96,26 @@ public sealed class FlowNavigator
     {
         if (session.CurrentFlowId is null) return;
 
-        var flow = _registry.GetFlow(session.CurrentFlowId);
-        if (flow is null) return;
-
-        var step = flow.Steps.ElementAtOrDefault(session.CurrentStepIndex);
-        if (step?.Skippable == true)
-            await AdvanceAsync(session, flow, flow.CloneData(session.Data!));
+        var flow = registry.GetFlow(session.CurrentFlowId);
+        await AdvanceAsync(session, flow, flow.CloneData(session.Data!));
     }
 
     /// <summary>Starts a root flow.</summary>
     public async Task StartFlowAsync(FlowSession session, string flowId)
     {
-        if (!_registry.TryGetRootFlow(flowId, out var flow)) return;
-
-        session.Reset();
+        var flow = registry.GetFlow(flowId);
+        session.ResetAfterFlow();
         session.CurrentFlowId = flowId;
         session.Data = flow.CreateData();
 
         if (flow.Steps.Count > 0)
-            await _renderer.RenderStepAsync(session, flow.Steps[0]);
+            await renderer.RenderStepAsync(session, flow.Steps[0]);
     }
 
     /// <summary>Starts a sub-flow from a handler, saving the current frame on the stack.</summary>
-    public async Task StartSubFlowAsync(FlowSession session, string subFlowId,
-        object dataSnapshot)
+    public async Task StartSubFlowAsync(FlowSession session, string subFlowId, object dataSnapshot)
     {
-        var sub = _registry.GetFlow(subFlowId);
-        if (sub is null) return;
+        var sub = registry.GetFlow(subFlowId);
 
         session.FlowStack.Push(new SubFlowFrame
         {
@@ -156,10 +127,10 @@ public sealed class FlowNavigator
 
         session.CurrentFlowId = subFlowId;
         session.CurrentStepIndex = 0;
-        session.StepHistory = new();
+        session.StepHistory = new Stack<StepHistoryEntry>();
 
         if (sub.Steps.Count > 0)
-            await _renderer.RenderStepAsync(session, sub.Steps[0]);
+            await renderer.RenderStepAsync(session, sub.Steps[0]);
     }
 
     /// <summary>Completes the current flow and returns to the parent or menu.</summary>
@@ -172,11 +143,8 @@ public sealed class FlowNavigator
             session.CurrentStepIndex = frame.StepIndex;
             session.StepHistory = frame.StepHistory;
 
-            var parent = _registry.GetFlow(frame.FlowId);
-            if (parent is not null)
-                await AdvanceAsync(session, parent);
-            else
-                await ResetToMenuAsync(session);
+            var parent = registry.GetFlow(frame.FlowId);
+            await AdvanceAsync(session, parent, parent.CloneData(session.Data!));
         }
         else
         {
@@ -187,16 +155,16 @@ public sealed class FlowNavigator
     /// <summary>Resets the session and shows the main menu.</summary>
     public async Task ResetToMenuAsync(FlowSession session)
     {
-        await _messages.CleanupAllFlowMessagesAsync(session);
+        await messages.CleanupAllFlowMessagesAsync(session);
 
         if (session.HasReplyKeyboard)
         {
-            await _messages.RemoveReplyKeyboardAsync(session.ChatId);
+            await messages.RemoveReplyKeyboardAsync(session.ChatId);
             session.HasReplyKeyboard = false;
         }
 
-        session.Reset();
+        session.ResetAfterFlow();
 
-        await _renderer.ShowMenuAsync(session);
+        await renderer.ShowMenuAsync(session);
     }
 }

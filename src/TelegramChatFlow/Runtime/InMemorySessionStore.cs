@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 
 namespace TelegramChatFlow.Runtime;
+// OK VISTO
 
 /// <summary>
 /// Implementazione in-memory dello store di sessioni.

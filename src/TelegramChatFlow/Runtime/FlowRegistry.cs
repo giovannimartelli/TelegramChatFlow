@@ -1,7 +1,9 @@
 namespace TelegramChatFlow.Runtime;
 
+
+// OK VISTO
 /// <summary>
-/// Registro dei flussi: gestisce la registrazione ricorsiva e il lookup per ID.
+/// Flow registry: handles recursive registration and lookup by ID.
 /// </summary>
 public sealed class FlowRegistry
 {
@@ -17,24 +19,17 @@ public sealed class FlowRegistry
         }
     }
 
-    /// <summary>Restituisce un flusso (root o sub-flow) per ID, o null se non trovato.</summary>
-    public FlowDefinition? GetFlow(string id) => _allFlows.GetValueOrDefault(id);
+    /// <summary>Returns a flow (root or sub-flow) by ID, or null if not found.</summary>
+    public FlowDefinition GetFlow(string id) => _allFlows.GetValueOrDefault(id) ?? throw new KeyNotFoundException($"Flow with ID '{id}' not found.");
+    
 
-    /// <summary>Restituisce un flusso root per ID, o null se non trovato.</summary>
-    public FlowDefinition? GetRootFlow(string id) => _rootFlows.GetValueOrDefault(id);
-
-    /// <summary>Restituisce true se il flusso root esiste.</summary>
-    public bool TryGetRootFlow(string id, out FlowDefinition flow) =>
-        _rootFlows.TryGetValue(id, out flow!);
-
-    /// <summary>Tutti i flussi root registrati.</summary>
+    /// <summary>All registered root flows.</summary>
     public IReadOnlyCollection<FlowDefinition> RootFlows => _rootFlows.Values;
 
     private void RegisterRecursive(FlowDefinition flow)
     {
         _allFlows[flow.Id] = flow;
-        if (flow.SubFlows is not null)
-            foreach (var sub in flow.SubFlows)
-                RegisterRecursive(sub);
+        foreach (var sub in flow.SubFlows ?? [])
+            RegisterRecursive(sub);
     }
 }

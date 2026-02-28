@@ -11,17 +11,8 @@ namespace TelegramChatFlow.Runtime;
 /// Manages sending, editing, and deleting Telegram messages.
 /// Keeps the chat clean by editing the existing message where possible.
 /// </summary>
-public sealed class MessageManager
+public sealed class MessageManager(ITelegramBotClient bot, ILogger<MessageManager> logger)
 {
-    private readonly ITelegramBotClient _bot;
-    private readonly ILogger<MessageManager> _logger;
-
-    public MessageManager(ITelegramBotClient bot, ILogger<MessageManager> logger)
-    {
-        _bot = bot;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Sends a new message or edits the existing one (the bot's active message).
     /// </summary>
@@ -29,7 +20,7 @@ public sealed class MessageManager
     {
         if (session.BotMessageId.HasValue)
         {
-            var edited = await TryEditAsync(() => _bot.EditMessageText(
+            var edited = await TryEditAsync(() => bot.EditMessageText(
                 session.ChatId,
                 session.BotMessageId.Value,
                 text,
@@ -38,13 +29,13 @@ public sealed class MessageManager
         }
 
         await ReplaceBotMessageAsync(session,
-            _bot.SendMessage(session.ChatId, text, replyMarkup: markup));
+            bot.SendMessage(session.ChatId, text, replyMarkup: markup));
     }
 
     /// <summary>Sends an additional message with reply keyboard (tracked for cleanup).</summary>
     public async Task SendReplyKeyboardAsync(FlowSession session, string text, ReplyKeyboardMarkup markup)
     {
-        var msg = await _bot.SendMessage(session.ChatId, text, replyMarkup: markup);
+        var msg = await bot.SendMessage(session.ChatId, text, replyMarkup: markup);
         session.TrackedMessageIds.Add(msg.MessageId);
     }
 
@@ -53,12 +44,12 @@ public sealed class MessageManager
     {
         try
         {
-            var msg = await _bot.SendMessage(chatId, "\u200B", replyMarkup: new ReplyKeyboardRemove());
+            var msg = await bot.SendMessage(chatId, "\u200B", replyMarkup: new ReplyKeyboardRemove());
             await TryDeleteAsync(chatId, msg.MessageId);
         }
         catch (ApiRequestException ex)
         {
-            _logger.LogWarning(ex, "Failed to remove reply keyboard for chat {ChatId}", chatId);
+            logger.LogWarning(ex, "Failed to remove reply keyboard for chat {ChatId}", chatId);
         }
     }
 
@@ -67,7 +58,7 @@ public sealed class MessageManager
     {
         try
         {
-            await _bot.DeleteMessage(chatId, messageId);
+            await bot.DeleteMessage(chatId, messageId);
         }
         catch (ApiRequestException)
         {
@@ -105,14 +96,14 @@ public sealed class MessageManager
     /// moves it to persistent messages, and clears BotMessageId.
     /// The next SendOrEditAsync call will send a new message.
     /// </summary>
-    public async Task DetachBotMessageAsync(FlowSession session)
+    public async Task DetachPersistentMessageAsync(FlowSession session)
     {
         if (session.BotMessageId == null) return;
 
         // Remove the inline keyboard from the detached message
         try
         {
-            await _bot.EditMessageReplyMarkup(
+            await bot.EditMessageReplyMarkup(
                 session.ChatId,
                 session.BotMessageId.Value,
                 replyMarkup: null);
@@ -126,12 +117,11 @@ public sealed class MessageManager
     /// <summary>
     /// Sends or edits the active bot message with media.
     /// </summary>
-    public async Task SendOrEditMediaAsync(
-        FlowSession session, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
+    public async Task SendOrEditMediaAsync(FlowSession session, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup)
     {
         if (session.BotMessageId.HasValue)
         {
-            var edited = await TryEditAsync(() => _bot.EditMessageMedia(
+            var edited = await TryEditAsync(() => bot.EditMessageMedia(
                 session.ChatId,
                 session.BotMessageId.Value,
                 ToInputMedia(showMediaType, fileId, caption),
@@ -163,7 +153,7 @@ public sealed class MessageManager
         }
         catch (ApiRequestException ex)
         {
-            _logger.LogWarning(ex, "Failed to edit message, sending a new one");
+            logger.LogWarning(ex, "Failed to edit message, sending a new one");
             return false;
         }
     }
@@ -182,10 +172,10 @@ public sealed class MessageManager
         long chatId, ShowMediaType showMediaType, string fileId, string? caption, InlineKeyboardMarkup? markup) =>
         showMediaType switch
         {
-            ShowMediaType.Photo     => _bot.SendPhoto(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
-            ShowMediaType.Video     => _bot.SendVideo(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
-            ShowMediaType.Document  => _bot.SendDocument(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
-            ShowMediaType.Animation => _bot.SendAnimation(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            ShowMediaType.Photo     => bot.SendPhoto(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            ShowMediaType.Video     => bot.SendVideo(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            ShowMediaType.Document  => bot.SendDocument(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
+            ShowMediaType.Animation => bot.SendAnimation(chatId, InputFile.FromFileId(fileId), caption: caption, replyMarkup: markup),
             _ => throw new ArgumentOutOfRangeException(nameof(showMediaType))
         };
 

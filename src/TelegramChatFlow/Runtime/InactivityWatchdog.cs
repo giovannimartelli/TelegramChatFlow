@@ -3,29 +3,21 @@ using Microsoft.Extensions.Options;
 
 namespace TelegramChatFlow.Runtime;
 
+// OK VISTO
+
 /// <summary>
 /// Periodically checks active sessions and resets those that are inactive
 /// beyond the configured threshold.
 /// </summary>
-public sealed class InactivityWatchdog : IDisposable
+public sealed class InactivityWatchdog(
+    ISessionStore store,
+    FlowEngine engine,
+    IOptions<FlowBotOptions> options,
+    ILogger<InactivityWatchdog> logger)
+    : IDisposable
 {
-    private readonly ISessionStore _store;
-    private readonly FlowEngine _engine;
-    private readonly FlowBotOptions _options;
-    private readonly ILogger<InactivityWatchdog> _logger;
+    private readonly FlowBotOptions _options = options.Value;
     private Timer? _timer;
-
-    public InactivityWatchdog(
-        ISessionStore store,
-        FlowEngine engine,
-        IOptions<FlowBotOptions> options,
-        ILogger<InactivityWatchdog> logger)
-    {
-        _store = store;
-        _engine = engine;
-        _options = options.Value;
-        _logger = logger;
-    }
 
     public void Start()
     {
@@ -40,20 +32,20 @@ public sealed class InactivityWatchdog : IDisposable
     {
         try
         {
-            var sessions = await _store.GetAllAsync();
+            var sessions = await store.GetAllAsync();
             var cutoff = DateTime.UtcNow - _options.InactivityTimeout;
 
             foreach (var session in sessions)
             {
                 if (session.CurrentFlowId is null || session.LastActivity >= cutoff) continue;
-                _logger.LogInformation("Chat session {ChatId} expired due to inactivity", session.ChatId);
+                logger.LogInformation("Chat session {ChatId} expired due to inactivity", session.ChatId);
 
-                await _engine.HandleInactivityAsync(session);
+                await engine.HandleInactivityAsync(session);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in inactivity watchdog");
+            logger.LogError(ex, "Error in inactivity watchdog");
         }
     }
 

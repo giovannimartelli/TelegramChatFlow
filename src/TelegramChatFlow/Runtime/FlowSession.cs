@@ -1,5 +1,7 @@
 namespace TelegramChatFlow.Runtime;
 
+// OK VISTO
+
 /// <summary>Stato persistente della conversazione di un singolo utente.</summary>
 public sealed class FlowSession
 {
@@ -16,13 +18,13 @@ public sealed class FlowSession
     public Stack<StepHistoryEntry> StepHistory { get; set; } = new();
 
     /// <summary>Azzera lo stato del flusso corrente.</summary>
-    public void Reset()
+    public void ResetAfterFlow()
     {
         CurrentFlowId = null;
         CurrentStepIndex = 0;
         Data = null;
-        FlowStack = new();
-        StepHistory = new();
+        FlowStack = new Stack<SubFlowFrame>();
+        StepHistory = new Stack<StepHistoryEntry>();
     }
 }
 
@@ -42,6 +44,7 @@ public sealed class SubFlowFrame
     public required Stack<StepHistoryEntry> StepHistory { get; init; }
 }
 
+//TODO: Spostare questa
 /// <summary>Interfaccia per la persistenza delle sessioni.</summary>
 public interface ISessionStore
 {
